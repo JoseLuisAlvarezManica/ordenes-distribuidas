@@ -56,5 +56,13 @@ Se utiliza para definir el mapeo de forma declarativa permitiendo definir los mo
  ## Redis
 
 # `ioredis.from_url` 
-Permite crear una nueva instancia de cliente Redis utilizando una URL de conexión en lugar de pasar un objeto de configuración con host, puerto, contraseña
+Permite crear una nueva instancia de cliente Redis utilizando una URL de conexión en lugar de pasar un objeto de configuración con host, puerto, contraseña.
 
+## httpx
+Biblioteca de python la cual permite realizar peticiones de HTTP de manera sencilla y permite conexiones asincronas, se ocupo junto a una clase para realizar las peticiones del gateway al writer.
+
+## uuid4
+Funcion de la libreria uuid, la cual permite generar identificadores unicos al azar. Con esta función se crearon los id de las peticiones, las cuales al llegar a la base de datos se convertiria en el id de una orden.
+
+## Annotated
+Annotated permite describir información extra (metadatos) sobre un tipo sin cambiar el tipo en sí. Frameworks como FastAPI pueden leer esos metadatos para aplicar comportamientos adicionales, como ejecutar dependencias definidas con `Depends`.

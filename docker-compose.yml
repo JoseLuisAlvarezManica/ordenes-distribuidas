@@ -20,6 +20,8 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -50,3 +52,4 @@ services:
 
 volumes:
   pg_data:
+  redis_data:

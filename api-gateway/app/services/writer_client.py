@@ -12,7 +12,9 @@ class WriterClient:
 
     async def post(self, endpoint: str, data: dict, headers: dict | None = None):
         request_id = (headers or {}).get("X-Request-Id", "N/A")
-        for attempt in range(self.max_retries):
+        retries = max(0, self.max_retries)
+        total_attempts = retries + 1
+        for attempt in range(total_attempts):
             try:
                 logger.info("Enviando a writer %s intento=%d [X-Request-Id: %s]", endpoint, attempt + 1, request_id)
                 response = await self.session.post(endpoint, json=data, headers=headers)

@@ -12,7 +12,7 @@ async def upsert_order(
     customer: str,
     items: list[dict],
 ) -> bool:
-   
+
     order_id_str = str(order_id)
     try:
         result = await session.execute(
@@ -29,5 +29,6 @@ async def upsert_order(
         session.add(new_order)
         await session.commit()
         return True
-    except Exception as e:
-        return {e}
+    except Exception:
+        await session.rollback()
+        raise

@@ -1,0 +1,393 @@
+{
+  "info": {
+    "_postman_id": "c9fbaad0-7066-4e5b-8cd3-4c164e4047d7",
+    "name": "Distributed Orders - API Gateway",
+    "description": "Colección para probar solo api-gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_host",
+      "value": "localhost",
+      "type": "string"
+    },
+    {
+      "key": "base_port",
+      "value": "8000",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Gateway Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{base_host}}:{{base_port}}/health",
+          "protocol": "http",
+          "host": [
+            "{{base_host}}"
+          ],
+          "port": "{{base_port}}",
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 or 503', function () {",
+              "  pm.expect([200, 503]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer\": \"Berny\",\n  \"items\": [\n    { \"sku\": \"A1\", \"qty\": 2 },\n    { \"sku\": \"B2\", \"qty\": 1 }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://{{base_host}}:{{base_port}}/orders/",
+          "protocol": "http",
+          "host": [
+            "{{base_host}}"
+          ],
+          "port": "{{base_port}}",
+          "path": [
+            "orders",
+            ""
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 202', function () {",
+              "  pm.response.to.have.status(202);",
+              "});",
+              "",
+              "pm.test('Response has order_id', function () {",
+              "  const body = pm.response.json();",
+              "  pm.expect(body).to.have.property('order_id');",
+              "  pm.expect(body.order_id).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('order_id', body.order_id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Order Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{base_host}}:{{base_port}}/orders/{{order_id}}",
+          "protocol": "http",
+          "host": [
+            "{{base_host}}"
+          ],
+          "port": "{{base_port}}",
+          "path": [
+            "orders",
+            "{{order_id}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has expected fields', function () {",
+              "  const body = pm.response.json();",
+              "  pm.expect(body).to.have.property('order_id');",
+              "  pm.expect(body).to.have.property('status');",
+              "  pm.expect(['RECEIVED', 'PERSISTED', 'FAILED']).to.include(body.status);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Malicious Payload Tests",
+      "item": [
+        {
+          "name": "Attack - Extra Fields Injection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"Berny\",\n  \"items\": [{ \"sku\": \"A1\", \"qty\": 1 }],\n  \"is_admin\": true,\n  \"$where\": \"this.qty > 0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{base_host}}:{{base_port}}/orders/",
+              "protocol": "http",
+              "host": [
+                "{{base_host}}"
+              ],
+              "port": "{{base_port}}",
+              "path": [
+                "orders",
+                ""
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attack - Customer Script Tag",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"<script>alert(1)</script>\",\n  \"items\": [{ \"sku\": \"A1\", \"qty\": 1 }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{base_host}}:{{base_port}}/orders/",
+              "protocol": "http",
+              "host": [
+                "{{base_host}}"
+              ],
+              "port": "{{base_port}}",
+              "path": [
+                "orders",
+                ""
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attack - Invalid SKU Characters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"Berny\",\n  \"items\": [{ \"sku\": \"DROP TABLE orders;--\", \"qty\": 1 }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{base_host}}:{{base_port}}/orders/",
+              "protocol": "http",
+              "host": [
+                "{{base_host}}"
+              ],
+              "port": "{{base_port}}",
+              "path": [
+                "orders",
+                ""
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attack - Invalid Quantity Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"Berny\",\n  \"items\": [{ \"sku\": \"A1\", \"qty\": \"100 OR 1=1\" }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{base_host}}:{{base_port}}/orders/",
+              "protocol": "http",
+              "host": [
+                "{{base_host}}"
+              ],
+              "port": "{{base_port}}",
+              "path": [
+                "orders",
+                ""
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attack - Too Many Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"Berny\",\n  \"items\": [\n    {\"sku\":\"A1\",\"qty\":1},{\"sku\":\"A2\",\"qty\":1},{\"sku\":\"A3\",\"qty\":1},{\"sku\":\"A4\",\"qty\":1},{\"sku\":\"A5\",\"qty\":1},\n    {\"sku\":\"A6\",\"qty\":1},{\"sku\":\"A7\",\"qty\":1},{\"sku\":\"A8\",\"qty\":1},{\"sku\":\"A9\",\"qty\":1},{\"sku\":\"A10\",\"qty\":1},\n    {\"sku\":\"A11\",\"qty\":1},{\"sku\":\"A12\",\"qty\":1},{\"sku\":\"A13\",\"qty\":1},{\"sku\":\"A14\",\"qty\":1},{\"sku\":\"A15\",\"qty\":1},\n    {\"sku\":\"A16\",\"qty\":1},{\"sku\":\"A17\",\"qty\":1},{\"sku\":\"A18\",\"qty\":1},{\"sku\":\"A19\",\"qty\":1},{\"sku\":\"A20\",\"qty\":1},\n    {\"sku\":\"A21\",\"qty\":1},{\"sku\":\"A22\",\"qty\":1},{\"sku\":\"A23\",\"qty\":1},{\"sku\":\"A24\",\"qty\":1},{\"sku\":\"A25\",\"qty\":1},\n    {\"sku\":\"A26\",\"qty\":1},{\"sku\":\"A27\",\"qty\":1},{\"sku\":\"A28\",\"qty\":1},{\"sku\":\"A29\",\"qty\":1},{\"sku\":\"A30\",\"qty\":1},\n    {\"sku\":\"A31\",\"qty\":1},{\"sku\":\"A32\",\"qty\":1},{\"sku\":\"A33\",\"qty\":1},{\"sku\":\"A34\",\"qty\":1},{\"sku\":\"A35\",\"qty\":1},\n    {\"sku\":\"A36\",\"qty\":1},{\"sku\":\"A37\",\"qty\":1},{\"sku\":\"A38\",\"qty\":1},{\"sku\":\"A39\",\"qty\":1},{\"sku\":\"A40\",\"qty\":1},\n    {\"sku\":\"A41\",\"qty\":1},{\"sku\":\"A42\",\"qty\":1},{\"sku\":\"A43\",\"qty\":1},{\"sku\":\"A44\",\"qty\":1},{\"sku\":\"A45\",\"qty\":1},\n    {\"sku\":\"A46\",\"qty\":1},{\"sku\":\"A47\",\"qty\":1},{\"sku\":\"A48\",\"qty\":1},{\"sku\":\"A49\",\"qty\":1},{\"sku\":\"A50\",\"qty\":1},\n    {\"sku\":\"A51\",\"qty\":1},{\"sku\":\"A52\",\"qty\":1},{\"sku\":\"A53\",\"qty\":1},{\"sku\":\"A54\",\"qty\":1},{\"sku\":\"A55\",\"qty\":1},\n    {\"sku\":\"A56\",\"qty\":1},{\"sku\":\"A57\",\"qty\":1},{\"sku\":\"A58\",\"qty\":1},{\"sku\":\"A59\",\"qty\":1},{\"sku\":\"A60\",\"qty\":1},\n    {\"sku\":\"A61\",\"qty\":1},{\"sku\":\"A62\",\"qty\":1},{\"sku\":\"A63\",\"qty\":1},{\"sku\":\"A64\",\"qty\":1},{\"sku\":\"A65\",\"qty\":1},\n    {\"sku\":\"A66\",\"qty\":1},{\"sku\":\"A67\",\"qty\":1},{\"sku\":\"A68\",\"qty\":1},{\"sku\":\"A69\",\"qty\":1},{\"sku\":\"A70\",\"qty\":1},\n    {\"sku\":\"A71\",\"qty\":1},{\"sku\":\"A72\",\"qty\":1},{\"sku\":\"A73\",\"qty\":1},{\"sku\":\"A74\",\"qty\":1},{\"sku\":\"A75\",\"qty\":1},\n    {\"sku\":\"A76\",\"qty\":1},{\"sku\":\"A77\",\"qty\":1},{\"sku\":\"A78\",\"qty\":1},{\"sku\":\"A79\",\"qty\":1},{\"sku\":\"A80\",\"qty\":1},\n    {\"sku\":\"A81\",\"qty\":1},{\"sku\":\"A82\",\"qty\":1},{\"sku\":\"A83\",\"qty\":1},{\"sku\":\"A84\",\"qty\":1},{\"sku\":\"A85\",\"qty\":1},\n    {\"sku\":\"A86\",\"qty\":1},{\"sku\":\"A87\",\"qty\":1},{\"sku\":\"A88\",\"qty\":1},{\"sku\":\"A89\",\"qty\":1},{\"sku\":\"A90\",\"qty\":1},\n    {\"sku\":\"A91\",\"qty\":1},{\"sku\":\"A92\",\"qty\":1},{\"sku\":\"A93\",\"qty\":1},{\"sku\":\"A94\",\"qty\":1},{\"sku\":\"A95\",\"qty\":1},\n    {\"sku\":\"A96\",\"qty\":1},{\"sku\":\"A97\",\"qty\":1},{\"sku\":\"A98\",\"qty\":1},{\"sku\":\"A99\",\"qty\":1},{\"sku\":\"A100\",\"qty\":1},\n    {\"sku\":\"A101\",\"qty\":1}\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{base_host}}:{{base_port}}/orders/",
+              "protocol": "http",
+              "host": [
+                "{{base_host}}"
+              ],
+              "port": "{{base_port}}",
+              "path": [
+                "orders",
+                ""
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

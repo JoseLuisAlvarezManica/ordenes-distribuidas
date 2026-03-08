@@ -8,6 +8,8 @@ from .db import engine
 from .models import Base
 from .redis_client import close_redis, get_redis
 
+from .routes import orders
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="writer-service", lifespan=lifespan)
-
+app.include_router(orders.router)
 
 @app.get("/health", tags=["ops"])
 async def health() -> JSONResponse:
@@ -41,3 +43,4 @@ async def health() -> JSONResponse:
     all_ok = all(v == "ok" for v in checks.values())
     http_status = status.HTTP_200_OK if all_ok else status.HTTP_503_SERVICE_UNAVAILABLE
     return JSONResponse(content={"status": "ok" if all_ok else "degraded", "checks": checks}, status_code=http_status)
+

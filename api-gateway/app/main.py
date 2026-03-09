@@ -8,6 +8,12 @@ import redis.asyncio as aioredis
 from .redis_client import close_redis, get_redis
 from .routes.orders import router as orders_router
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 redis_dependency = Annotated[aioredis.Redis, Depends(get_redis)]
 

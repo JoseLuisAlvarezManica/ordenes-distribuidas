@@ -18,6 +18,12 @@ async def lifespan(app: FastAPI):
     yield
     await close_redis()
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = FastAPI(title="writer-service", lifespan=lifespan)
 app.include_router(orders.router)

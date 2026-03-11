@@ -55,7 +55,7 @@ Se utiliza para definir el mapeo de forma declarativa permitiendo definir los mo
 
  ## Redis
 
-# `ioredis.from_url` 
+# `aioredis.from_url` 
 Permite crear una nueva instancia de cliente Redis utilizando una URL de conexión en lugar de pasar un objeto de configuración con host, puerto, contraseña.
 
 ## httpx

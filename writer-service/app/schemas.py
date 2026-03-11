@@ -48,4 +48,3 @@ class InternalOrder(BaseModel):
             raise ValueError("customer contiene caracteres no permitidos")
         return value
 
-

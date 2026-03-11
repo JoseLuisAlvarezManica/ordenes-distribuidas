@@ -25,6 +25,20 @@ services:
       interval: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    ports:
+    - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/
+      - rabbitmq_log:/var/log/rabbitmq/
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      retries: 5
 
   api-gateway:
     build: ./api-gateway
@@ -47,7 +61,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  inventory-service:
+    build: ./inventory-service
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   pg_data:
   redis_data:
+  rabbitmq_data:
+  rabbitmq_log:

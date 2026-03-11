@@ -23,7 +23,7 @@ class WriterClient:
                 return response.json()
             except (httpx.HTTPStatusError, httpx.TransportError) as exc:
                 logger.warning("Intento %d fallido: %s [X-Request-Id: %s]", attempt + 1, exc, request_id)
-        raise RuntimeError("Max retries exceeded")
+        raise Exception("Max retries exceeded")
 
 # Inyección de dependencia, solo hable un cliente por request
 async def get_writer_client():

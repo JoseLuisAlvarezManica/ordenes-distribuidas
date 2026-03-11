@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Order
+from ..models import Order, Product
 
 
 async def upsert_order(
@@ -32,3 +32,14 @@ async def upsert_order(
     except Exception:
         await session.rollback()
         raise
+
+async def validate_stock(session: AsyncSession, items: list[dict]) -> list[str]:
+    errors = []
+    for item in items:
+        result = await session.execute(select(Product).where(Product.sku == item["sku"]))
+        product = result.scalar_one_or_none()
+        if product is None:
+            errors.append(f"SKU '{item['sku']}' no existe")
+        elif product.stock < item["qty"]:
+            errors.append(f"SKU '{item['sku']}' stock insuficiente (disponible: {product.stock}, solicitado: {item['qty']})")
+    return errors

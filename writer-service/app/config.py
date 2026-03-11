@@ -9,5 +9,7 @@ class Settings(BaseSettings):
 
     redis_url: str = os.getenv("REDIS_URL")
 
+    rabbitmq_url: str = os.getenv("RABBITMQ_URL")
+
 
 settings = Settings()

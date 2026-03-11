@@ -4,26 +4,41 @@ from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from .db import engine
+from .db import engine, AsyncSessionLocal
 from .models import Base
 from .redis_client import close_redis, get_redis
 
 from .routes import orders
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    await close_redis()
+from .seeder import Seeder
+from .rabbit_publisher import rabbit_connect, rabbit_close
 
 import logging
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    force=True,
 )
+
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    try:
+        async with AsyncSessionLocal() as session:
+            seeder = Seeder(session)
+            await seeder.seed()
+    except Exception as exc:
+        logger.error(f"[Seeder] Error: {exc}", exc_info=True)
+
+    rabbit_connect()
+
+    yield
+    await close_redis()
+    rabbit_close()
 
 app = FastAPI(title="writer-service", lifespan=lifespan)
 app.include_router(orders.router)

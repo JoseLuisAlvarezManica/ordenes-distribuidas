@@ -36,12 +36,13 @@ async def create_order(
             "items": [{"sku": item.sku, "qty": item.qty} for item in order_data.items],
         }
         await writer_client.post("/internal/orders", order_payload, headers={"X-Request-Id": request_id})
+    
     except Exception:
         now = datetime.now(timezone.utc).isoformat()
         await redis.execute_command("HSET", redis_key, "status", "FAILED", "last_update", now)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"message": "Writer service unavailable", "order_id": order_id},
+            detail={"message": "Writer service or database unavailable", "order_id": order_id},
         )
 
     return CreateOrderResponse(order_id=order_id, status="RECEIVED")

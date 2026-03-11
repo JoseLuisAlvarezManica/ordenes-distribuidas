@@ -186,3 +186,171 @@ Definidas en `.env` y compartidas vía `docker-compose.yml`:
 | `WRITER_SERVICE_URL`     | `http://writer-service:8001`                                           |
 | `WRITER_TIMEOUT_SECONDS` | `1.0`                                                                  |
 | `WRITER_MAX_RETRIES`     | `1`                                                                    |
+| `RABBITMQ_URL`           | `amqp://superuser:superpassword@rabbitmq:5672/`                        |
+
+---
+
+# Parte 2 — Inventario y mensajería asíncrona
+
+Se incorporó un tercer microservicio (`inventory-service`) y RabbitMQ como bus de eventos. El sistema ya no descuenta stock de forma síncrona: el writer persiste la orden y publica un evento; el inventory-service lo consume en segundo plano y ajusta el stock.
+
+## Nueva arquitectura
+
+### Diagrama de componentes
+
+```mermaid
+flowchart TB
+    Client["🖥️ Cliente"]
+
+    subgraph docker["Docker Network"]
+
+        subgraph gw["api-gateway · :8000"]
+            POST_orders["POST /orders"]
+            GET_orders["GET /orders/{id}"]
+        end
+
+        subgraph ws["writer-service · :8001"]
+            POST_internal["POST /internal/orders"]
+            validate["validate_stock()"]
+            upsert["upsert_order()"]
+            publish["publish_order.created()"]
+        end
+
+        subgraph inv["inventory-service · worker"]
+            subscriber["rabbit_subscriber<br/>(hilo daemon)"]
+            handler["on_order_created()"]
+            svc["discount_inventory()"]
+        end
+
+        Redis[("Redis :6379<br/>order:{id} status")]
+        Postgres[("Postgres :5432<br/>tabla orders<br/>tabla products")]
+        RabbitMQ["RabbitMQ :5672<br/>exchange: orders type topic<br/>routing key: order.created<br/>queue: inventory.order.created"]
+    end
+
+    Client --> POST_orders
+    Client --> GET_orders
+
+    POST_orders -->|"HSET status=RECEIVED"| Redis
+    POST_orders -->|"HTTP POST /internal/orders"| POST_internal
+    POST_internal --> validate
+    validate -->|"SELECT stock FROM products"| Postgres
+    validate -->|"stock insuficiente → HSET status=FAILED"| Redis
+    POST_internal --> upsert
+    upsert -->|"INSERT INTO orders"| Postgres
+    upsert -->|"HSET status=PERSISTED"| Redis
+    POST_internal --> publish
+    publish -->|"order.created"| RabbitMQ
+
+    RabbitMQ -->|"inventory.order.created"| subscriber
+    subscriber --> handler
+    handler --> svc
+    svc -->|"UPDATE products SET stock = stock - qty"| Postgres
+
+    GET_orders -->|"HGETALL order:{id}"| Redis
+```
+
+### Diagrama de secuencia
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Cliente
+    participant GW as api-gateway
+    participant R as Redis
+    participant WS as writer-service
+    participant PG as Postgres
+    participant MQ as RabbitMQ
+    participant INV as inventory-service
+
+    C->>GW: POST /orders {customer, items}
+    GW->>R: HSET order:{id} status=RECEIVED
+    GW->>WS: POST /internal/orders
+
+    WS->>PG: SELECT stock FROM products (por cada SKU)
+    alt stock insuficiente
+        WS->>R: HSET status=FAILED
+        WS-->>GW: 422 Unprocessable Entity
+        GW-->>C: 202 Accepted (status quedará FAILED)
+    else stock ok
+        WS->>PG: INSERT INTO orders
+        WS->>R: HSET status=PERSISTED
+        WS->>MQ: publish order.created
+        WS-->>GW: 201 Created
+        GW-->>C: 202 Accepted {order_id}
+    end
+
+    Note over MQ,INV: Procesamiento asíncrono
+
+    MQ->>INV: order.created (queue: inventory.order.created)
+    INV->>PG: SELECT … FOR UPDATE (por cada SKU)
+    INV->>PG: UPDATE products SET stock = stock - qty
+    INV->>MQ: basic_ack
+```
+
+### Resumen de la nueva arquitectura
+
+| Aspecto              | Detalle                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| **Mensajería**       | RabbitMQ con exchange `orders` tipo `topic`, routing key `order.created`             |
+| **Validación previa**| Writer valida stock disponible antes de persistir la orden                           |
+| **Descuento**        | Asíncrono en inventory-service tras recibir el evento `order.created`                |
+| **Consistencia**     | `SELECT … FOR UPDATE` evita race conditions al descontar stock                       |
+| **Idempotencia**     | Writer sigue verificando `order_id` antes de insertar                                |
+| **Fault tolerance**  | `basic_nack(requeue=False)` descarta mensajes malformados sin bucle infinito         |
+| **Productos**        | 25 productos pre-cargados por el seeder al iniciar writer-service                    |
+
+## Nuevo servicio: inventory-service
+
+Worker puro (sin HTTP) que escucha eventos de RabbitMQ y descuenta stock en Postgres.
+
+### Estructura
+
+```
+inventory-service/
+├── Dockerfile
+├── requirements.txt
+└── app/
+    ├── main.py                        # arranque, handler on_order_created
+    ├── config.py                      
+    ├── db.py                          # engine/session SQLAlchemy async
+    ├── models.py                    
+    ├── schemas.py                     # Pydantic
+    └── services/
+        ├── rabbit_subscriber.py       # infraestructura RabbitMQ
+        └── inventory_service.py       # lógica de descuento de stock
+```
+
+### Estados de una orden
+
+```
+RECEIVED → PERSISTED → (stock descontado async)
+RECEIVED → FAILED    (stock insuficiente al momento de crear la orden)
+```
+
+## Cómo ejecutar
+
+```bash
+docker compose up --build
+```
+
+### Ejemplo de petición
+
+```http
+POST http://localhost:8000/orders/
+Content-Type: application/json
+
+{
+  "customer": "Juan Pérez",
+  "items": [
+    { "sku": "003-E", "qty": 2 },
+    { "sku": "010-A", "qty": 1 },
+    { "sku": "009-P", "qty": 5 }
+  ]
+}
+```
+
+### Consultar estado
+
+```bash
+curl http://localhost:8000/orders/<order_id>
+```

@@ -66,3 +66,24 @@ Funcion de la libreria uuid, la cual permite generar identificadores unicos al a
 
 ## Annotated
 Annotated permite describir información extra (metadatos) sobre un tipo sin cambiar el tipo en sí. Frameworks como FastAPI pueden leer esos metadatos para aplicar comportamientos adicionales, como ejecutar dependencias definidas con `Depends`.
+
+## RabbitMQ
+un broker de mensajeria, este ayuda a desacoplar distintos servicios al poder repartir mensajes a traves de un sistema de publicaciones y subscripciones.
+
+## Pika
+Biblioteca de python la cual se ocupa para implementar el protocolo AMQP 0-9-1, el cual es uno de los posibles protocolos a ocupar para establecer comunicaciones con RabbitMQ.
+
+## ack / nack
+
+Son la forma de confirmarle a RabbitMQ qué pasó con un mensaje:
+
+- **ack** (acknowledge): "procesé el mensaje correctamente". RabbitMQ lo elimina de la queue.
+- **nack** (negative acknowledge): "algo salió mal". Con `requeue=False` RabbitMQ lo descarta; con `requeue=True` lo devuelve a la queue para reintentarlo.
+
+Si el consumer no hace ni ack ni nack y se desconecta, RabbitMQ reencola el mensaje automáticamente.
+
+## Callable
+
+`Callable` es un tipo de Python que representa cualquier objeto que se puede llamar como función: funciones normales, lambdas, métodos, o clases con `__call__`.
+
+Se usa en `rabbit_subscriber.py` para declarar que `on_message` es un parámetro que acepta una función con una firma específica:

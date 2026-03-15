@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import threading
+import time
 
 
 from .schemas import OrderCreatedEvent
 from .services.inventory_service import discount_inventory
+from .services.rabbit_publisher import publish_processing_event
 from .services.rabbit_subscriber import start_subscriber, stop_subscriber
 
 logging.basicConfig(
@@ -20,12 +22,36 @@ ROUTING_KEY = "order.created"
 
 
 def on_order_created(channel, method, properties, body: bytes) -> None:
+    started = time.perf_counter()
+    event: OrderCreatedEvent | None = None
     try:
         event = OrderCreatedEvent.model_validate_json(body)
         logger.info("order.created recibido order_id=%s", event.order_id)
         asyncio.run(discount_inventory(event.items))
+        duration_ms = (time.perf_counter() - started) * 1000
+        publish_processing_event(
+            {
+                "order_id": event.order_id,
+                "service": "inventory",
+                "status": "success",
+                "duration_ms": round(duration_ms, 2),
+            }
+        )
         channel.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as exc:
+        duration_ms = (time.perf_counter() - started) * 1000
+        try:
+            publish_processing_event(
+                {
+                    "order_id": event.order_id if event else None,
+                    "service": "inventory",
+                    "status": "error",
+                    "duration_ms": round(duration_ms, 2),
+                    "error": str(exc),
+                }
+            )
+        except Exception as publish_exc:
+            logger.warning("No se pudo publicar evento de error de inventory: %s", publish_exc)
         logger.error("Error procesando order.created: %s", exc, exc_info=True)
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 

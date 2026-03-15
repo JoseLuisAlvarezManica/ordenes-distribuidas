@@ -21,9 +21,14 @@ _connection: pika.BlockingConnection | None = None
 def rabbit_connect() -> None:
     """Chequea conectividad a RabbitMQ y declara el exchange."""
     global _connection
-    _connection = pika.BlockingConnection(pika.URLParameters(settings.rabbitmq_url))
+    params = pika.URLParameters(settings.rabbitmq_url)
+    # Conexion de verificacion (startup): no deja un socket ocioso con heartbeat activo.
+    params.heartbeat = 0
+    _connection = pika.BlockingConnection(params)
     channel = _connection.channel()
     channel.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
+    _connection.close()
+    _connection = None
     logger.info("RabbitMQ connected, exchange '%s' ready.", EXCHANGE)
 
 
@@ -68,13 +73,20 @@ class RabbitPublisher:
                 logger.warning("Rabbit publish failed (attempt %s): %s", attempt + 1, exc)
                 time.sleep(0.2)
 
-    async def publish_order_created(self, payload: dict) -> None:
+    async def publish(self, routing_key: str, payload: dict) -> None:
         body = json.dumps(payload).encode()
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
-            None, functools.partial(self._publish_sync, "order.created", body)
+            None, functools.partial(self._publish_sync, routing_key, body)
         )
+
+    async def publish_order_created(self, payload: dict) -> None:
+        await self.publish("order.created", payload)
         logger.info("Published order.created: %s", payload)
+
+    async def publish_order_error(self, payload: dict) -> None:
+        await self.publish("order.error", payload)
+        logger.info("Published order.error: %s", payload)
 
 
 def get_publisher() -> RabbitPublisher:

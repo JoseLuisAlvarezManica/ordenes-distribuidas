@@ -132,6 +132,7 @@ distributed-orders/
 | ------------------ | ------ | --------------------------------------- |
 | **api-gateway**    | 8000   | API pública – recibe y consulta órdenes |
 | **writer-service** | 8001   | Servicio interno – persiste en Postgres |
+| **analytics-service** | 8002 | API de analítica en tiempo real de eventos de órdenes |
 | **notification-service** | - | Worker de RabbitMQ + bot de Telegram |
 | **postgres**       | 5432   | Base de datos relacional                |
 | **redis**          | 6379   | Caché de estado de órdenes              |
@@ -150,6 +151,12 @@ distributed-orders/
 | Método | Ruta               | Descripción                                     |
 | ------ | ------------------ | ----------------------------------------------- |
 | `POST` | `/internal/orders` | Persiste la orden en Postgres y actualiza Redis |
+
+### Analytics Service
+
+| Método | Ruta         | Descripción |
+| ------ | ------------ | ----------- |
+| `GET`  | `/analytics` | Devuelve productos más pedidos, cliente más frecuente, porcentaje de errores y tiempos promedio de persistencia/publicación/notificación |
 
 ## Características distribuidas
 
@@ -171,6 +178,9 @@ curl -X POST http://localhost:8000/orders \
 
 # Consultar estado (usar el order_id devuelto)
 curl http://localhost:8000/orders/<order_id>
+
+# Consultar analitica agregada
+curl http://localhost:8002/analytics
 
 # En Telegram, registrar tu chat con tu teléfono
 # /start +573001112233

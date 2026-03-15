@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timezone
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -30,37 +31,43 @@ async def create_internal_order(
     if stock_errors:
         now = datetime.now(timezone.utc).isoformat()
         await redis.execute_command("HSET", redis_key, "status", "FAILED", "last_update", now)
+        try:
+            await publisher.publish_order_error(
+                {
+                    "order_id": str(order.order_id),
+                    "stage": "validation",
+                    "error": "; ".join(stock_errors),
+                }
+            )
+        except Exception as publish_exc:
+            logger.warning("No se pudo publicar order.error (validation): %s", publish_exc)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"errors": stock_errors},
         )
 
     try:
+        persist_started = time.perf_counter()
         inserted = await upsert_order(
             session=db,
             order_id=order.order_id,
             customer=order.customer,
             items=[{"sku": item.sku, "qty": item.qty} for item in order.items],
         )
-        now = datetime.now(timezone.utc).isoformat()
-        await redis.execute_command("HSET", redis_key, "status", "PERSISTED", "last_update", now)
-        await publisher.publish_order_created({
-            "order_id": str(order.order_id),
-            "customer": order.customer,
-            "phone_number": order.phone_number,
-            "items": [{"sku": item.sku, "qty": item.qty} for item in order.items],
-        })
-        logger.info(
-            "Orden persistida inserted=%s order_id=%s [X-Request-Id: %s]",
-            inserted,
-            order.order_id,
-            correlation_id,
-        )
-        return {"order_id": str(order.order_id), "status": "PERSISTED"}
-    
+        persist_ms = (time.perf_counter() - persist_started) * 1000
     except Exception as exc:
         now = datetime.now(timezone.utc).isoformat()
         await redis.execute_command("HSET", redis_key, "status", "FAILED", "last_update", now)
+        try:
+            await publisher.publish_order_error(
+                {
+                    "order_id": str(order.order_id),
+                    "stage": "persist",
+                    "error": str(exc),
+                }
+            )
+        except Exception as publish_exc:
+            logger.warning("No se pudo publicar order.error (persist): %s", publish_exc)
         logger.exception(
             "Error persisting order_id=%s [X-Request-Id: %s]: %s",
             order.order_id,
@@ -71,3 +78,63 @@ async def create_internal_order(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error persisting order",
         ) from exc
+
+    now = datetime.now(timezone.utc).isoformat()
+    await redis.execute_command("HSET", redis_key, "status", "PERSISTED", "last_update", now)
+
+    try:
+        publish_started = time.perf_counter()
+        await publisher.publish_order_created(
+            {
+                "order_id": str(order.order_id),
+                "customer": order.customer,
+                "phone_number": order.phone_number,
+                "items": [{"sku": item.sku, "qty": item.qty} for item in order.items],
+                "persist_ms": round(persist_ms, 2),
+            }
+        )
+        publish_ms = (time.perf_counter() - publish_started) * 1000
+
+        await publisher.publish(
+            "order.processing",
+            {
+                "order_id": str(order.order_id),
+                "service": "writer",
+                "status": "success",
+                "metric": "publish",
+                "duration_ms": round(publish_ms, 2),
+            },
+        )
+    except Exception as exc:
+        now = datetime.now(timezone.utc).isoformat()
+        await redis.execute_command("HSET", redis_key, "status", "FAILED", "last_update", now)
+        try:
+            await publisher.publish_order_error(
+                {
+                    "order_id": str(order.order_id),
+                    "stage": "publish",
+                    "error": str(exc),
+                }
+            )
+        except Exception as publish_exc:
+            logger.warning("No se pudo publicar order.error (publish): %s", publish_exc)
+        logger.exception(
+            "Error publishing order.created order_id=%s [X-Request-Id: %s]: %s",
+            order.order_id,
+            correlation_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error publishing order event",
+        ) from exc
+
+    logger.info(
+        "Orden persistida inserted=%s order_id=%s persist_ms=%.2f publish_ms=%.2f [X-Request-Id: %s]",
+        inserted,
+        order.order_id,
+        persist_ms,
+        publish_ms,
+        correlation_id,
+    )
+    return {"order_id": str(order.order_id), "status": "PERSISTED"}

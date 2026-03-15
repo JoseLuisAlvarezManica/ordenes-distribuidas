@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 import threading
+import time
 
 import telegram
 from sqlalchemy import String, column, select, table
@@ -10,6 +11,7 @@ from .config import settings
 from .db import AsyncSessionLocal, engine
 from .models import Base
 from .services.register_user import get_chat_id_by_phone, register_user
+from .services.rabbit_publisher import publish_processing_event
 from .schemas import OrderCreatedEvent
 from .services.rabbit_subscriber import start_subscriber
 
@@ -203,6 +205,8 @@ async def _init_db() -> None:
 
 
 def on_order_created(channel, method, properties, body: bytes) -> None:
+    started = time.perf_counter()
+    event: OrderCreatedEvent | None = None
     try:
         event = OrderCreatedEvent.model_validate_json(body)
         logger.info("order.created recibido order_id=%s", event.order_id)
@@ -214,8 +218,31 @@ def on_order_created(channel, method, properties, body: bytes) -> None:
 
         future = asyncio.run_coroutine_threadsafe(notify(event), _ASYNC_LOOP)
         future.result(timeout=30)
+
+        duration_ms = (time.perf_counter() - started) * 1000
+        publish_processing_event(
+            {
+                "order_id": event.order_id,
+                "service": "notification",
+                "status": "success",
+                "duration_ms": round(duration_ms, 2),
+            }
+        )
         channel.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as exc:
+        duration_ms = (time.perf_counter() - started) * 1000
+        try:
+            publish_processing_event(
+                {
+                    "order_id": event.order_id if event else None,
+                    "service": "notification",
+                    "status": "error",
+                    "duration_ms": round(duration_ms, 2),
+                    "error": str(exc),
+                }
+            )
+        except Exception as publish_exc:
+            logger.warning("No se pudo publicar evento de error de notification: %s", publish_exc)
         logger.error("Error procesando order.created: %s", exc, exc_info=True)
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 

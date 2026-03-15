@@ -82,6 +82,15 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  analytics-service:
+    build: ./analytics-service
+    ports:
+      - "8002:8002"
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
 volumes:
   pg_data:
   redis_data:

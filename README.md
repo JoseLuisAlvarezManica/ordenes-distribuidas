@@ -27,7 +27,7 @@ flowchart TB
         Postgres[("Postgres :5432<br/><br/>Tabla orders<br/>• order_id — PK varchar(36)<br/>• customer — varchar(255)<br/>• items — JSON<br/>• created_at — timestamp")]
     end
 
-    Client -->|"POST /orders<br/>{customer, items:[{sku,qty}]}"| POST_orders
+    Client -->|"POST /orders<br/>{customer, phone_number, items:[{sku,qty}]}"| POST_orders
     Client -->|"GET /orders/{id}"| GET_orders
 
     POST_orders -->|"① HSET order:{id}<br/>status = RECEIVED"| Redis
@@ -53,7 +53,7 @@ sequenceDiagram
     participant WS as writer-service :8001
     participant PG as Postgres :5432
 
-    C->>GW: POST /orders {customer, items}
+    C->>GW: POST /orders {customer, phone_number, items}
     GW->>GW: genera order_id (UUID) + X-Request-Id
     GW->>R: HSET order:{id} status=RECEIVED
     GW->>WS: POST /internal/orders + X-Request-Id<br/>(timeout 1 s, max 1 retry)
@@ -132,6 +132,7 @@ distributed-orders/
 | ------------------ | ------ | --------------------------------------- |
 | **api-gateway**    | 8000   | API pública – recibe y consulta órdenes |
 | **writer-service** | 8001   | Servicio interno – persiste en Postgres |
+| **notification-service** | - | Worker de RabbitMQ + bot de Telegram |
 | **postgres**       | 5432   | Base de datos relacional                |
 | **redis**          | 6379   | Caché de estado de órdenes              |
 
@@ -141,7 +142,7 @@ distributed-orders/
 
 | Método | Ruta                 | Descripción                                                                    |
 | ------ | -------------------- | ------------------------------------------------------------------------------ |
-| `POST` | `/orders`            | Crea una orden. Body: `{ "customer": "...", "items": [{"sku":"A1","qty":2}] }` |
+| `POST` | `/orders`            | Crea una orden. Body: `{ "customer": "...", "phone_number": "+573001112233", "items": [{"sku":"A1","qty":2}] }` |
 | `GET`  | `/orders/{order_id}` | Consulta el estado de una orden                                                |
 
 ### Writer Service (interno)
@@ -166,10 +167,13 @@ docker compose up --build
 # Crear una orden
 curl -X POST http://localhost:8000/orders \
   -H "Content-Type: application/json" \
-  -d '{"customer": "Berny", "items": [{"sku": "A1", "qty": 2}]}'
+    -d '{"customer": "Berny", "phone_number": "+573001112233", "items": [{"sku": "A1", "qty": 2}]}'
 
 # Consultar estado (usar el order_id devuelto)
 curl http://localhost:8000/orders/<order_id>
+
+# En Telegram, registrar tu chat con tu teléfono
+# /start +573001112233
 ```
 
 ## Variables de entorno
@@ -187,6 +191,8 @@ Definidas en `.env` y compartidas vía `docker-compose.yml`:
 | `WRITER_TIMEOUT_SECONDS` | `1.0`                                                                  |
 | `WRITER_MAX_RETRIES`     | `1`                                                                    |
 | `RABBITMQ_URL`           | `amqp://superuser:superpassword@rabbitmq:5672/`                        |
+| `TELEGRAM_BOT_TOKEN`     | Token del bot de Telegram                                               |
+| `TELEGRAM_POLL_SECONDS`  | Intervalo de reintento del polling de Telegram (default: `2`)          |
 
 ---
 
@@ -262,7 +268,7 @@ sequenceDiagram
     participant MQ as RabbitMQ
     participant INV as inventory-service
 
-    C->>GW: POST /orders {customer, items}
+    C->>GW: POST /orders {customer, phone_number, items}
     GW->>R: HSET order:{id} status=RECEIVED
     GW->>WS: POST /internal/orders
 
@@ -341,6 +347,7 @@ Content-Type: application/json
 
 {
   "customer": "Juan Pérez",
+    "phone_number": "+573001112233",
   "items": [
     { "sku": "003-E", "qty": 2 },
     { "sku": "010-A", "qty": 1 },

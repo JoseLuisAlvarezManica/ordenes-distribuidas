@@ -73,6 +73,15 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  notification-service:
+    build: ./notification-service
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
 volumes:
   pg_data:
   redis_data:

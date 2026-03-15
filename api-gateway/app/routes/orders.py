@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from ..config import settings
 from ..redis_client import get_redis
 from ..schemas import CreateOrderRequest, CreateOrderResponse, OrderStatusResponse
 from ..services.writer_client import WriterClient, get_writer_client
@@ -21,6 +22,13 @@ async def create_order(
     writer_client: writer_dependency,
     redis: redis_dependency,
 ) -> CreateOrderResponse:
+    phone_number = order_data.phone_number or settings.support_number
+    if not phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No phone_number in payload and SUPPORT_NUMBER is not configured",
+        )
+
     order_id = str(uuid4())
     request_id = str(uuid4())
     redis_key = f"order:{order_id}"
@@ -33,6 +41,7 @@ async def create_order(
         order_payload = {
             "order_id": order_id,
             "customer": order_data.customer,
+            "phone_number": phone_number,
             "items": [{"sku": item.sku, "qty": item.qty} for item in order_data.items],
         }
         await writer_client.post("/internal/orders", order_payload, headers={"X-Request-Id": request_id})

@@ -14,6 +14,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+logging.getLogger("pika").setLevel(logging.WARNING)
 
 EXCHANGE = "orders"
 QUEUE = "analytics.order.events"

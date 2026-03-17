@@ -21,6 +21,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+logging.getLogger("pika").setLevel(logging.WARNING)
 
 EXCHANGE = "orders"
 QUEUE = "notification.order.created"
@@ -152,6 +153,8 @@ async def _process_start_command(message: dict) -> None:
 async def _poll_telegram_updates(stop_event: threading.Event) -> None:
     if not settings.telegram_bot_token:
         logger.warning("TELEGRAM_BOT_TOKEN no configurado. /start deshabilitado.")
+        while not stop_event.is_set():
+            await asyncio.sleep(1)
         return
 
     bot = telegram.Bot(settings.telegram_bot_token)

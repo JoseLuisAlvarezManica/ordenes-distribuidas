@@ -19,11 +19,18 @@ QUEUE = "inventory.order.created"
 ROUTING_KEY = "order.created"
 
 
+_loop = None
+
 def on_order_created(channel, method, properties, body: bytes) -> None:
+    global _loop
+    if _loop is None:
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+        
     try:
         event = OrderCreatedEvent.model_validate_json(body)
         logger.info("order.created recibido order_id=%s", event.order_id)
-        asyncio.run(discount_inventory(event.items))
+        _loop.run_until_complete(discount_inventory(event.items))
         channel.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as exc:
         logger.error("Error procesando order.created: %s", exc, exc_info=True)

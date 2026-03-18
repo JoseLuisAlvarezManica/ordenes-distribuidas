@@ -5,6 +5,7 @@ import threading
 import time
 
 import telegram
+from telegram.error import NetworkError, TimedOut
 from sqlalchemy import String, column, select, table
 
 from .config import settings
@@ -167,14 +168,25 @@ async def _poll_telegram_updates(stop_event: threading.Event) -> None:
 
     bot = telegram.Bot(settings.telegram_bot_token)
     offset: int | None = None
+    retry_delay = settings.telegram_poll_seconds
 
     async with bot:
-        me = await bot.get_me()
-        logger.info("Bot autenticado: @%s (id=%s)", me.username, me.id)
-
         while not stop_event.is_set():
             try:
-                updates = await bot.get_updates(offset=offset, timeout=30)
+                if offset is None:
+                    me = await bot.get_me(
+                        connect_timeout=settings.telegram_connect_timeout,
+                        read_timeout=settings.telegram_read_timeout,
+                    )
+                    logger.info("Bot autenticado: @%s (id=%s)", me.username, me.id)
+
+                updates = await bot.get_updates(
+                    offset=offset,
+                    timeout=settings.telegram_poll_timeout,
+                    connect_timeout=settings.telegram_connect_timeout,
+                    read_timeout=settings.telegram_read_timeout,
+                )
+                retry_delay = settings.telegram_poll_seconds
                 for update in updates:
                     if isinstance(update.update_id, int):
                         offset = update.update_id + 1
@@ -183,6 +195,16 @@ async def _poll_telegram_updates(stop_event: threading.Event) -> None:
                     if message is None:
                         continue
                     await _process_start_command(message.to_dict())
+            except TimedOut:
+                logger.warning("Timeout en polling de Telegram. Reintentando...")
+            except NetworkError as exc:
+                logger.warning(
+                    "Error de red en Telegram: %s. Reintentando en %.1fs",
+                    exc,
+                    retry_delay,
+                )
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, settings.telegram_retry_backoff_max)
             except Exception as exc:
                 logger.error("Error en polling de Telegram: %s", exc, exc_info=True)
                 await asyncio.sleep(settings.telegram_poll_seconds)

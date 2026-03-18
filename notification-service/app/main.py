@@ -27,7 +27,7 @@ EXCHANGE = "orders"
 QUEUE = "notification.order.created"
 ROUTING_KEY = "order.created"
 PHONE_PATTERN = re.compile(r"^\+?[1-9]\d{7,14}$")
-START_PATTERN = re.compile(r"^/start(?:@[A-Za-z0-9_]+)?(?:\s+(.+))?$")
+START_PATTERN = re.compile(r"^/register(?:@[A-Za-z0-9_]+)?(?:\s+(.+))?$")
 
 _ASYNC_LOOP: asyncio.AbstractEventLoop | None = None
 _ASYNC_LOOP_READY = threading.Event()
@@ -129,16 +129,24 @@ async def _process_start_command(message: dict) -> None:
     if not phone_arg:
         await _send_telegram_message(
             chat_id=chat_id,
-            text="Usa: /start <telefono>. Ejemplo: /start +573001112233",
+            text="Usa: /register <telefono>. Ejemplo: /register 3001112233",
         )
         return
 
     try:
         phone_number = _normalize_phone_number(phone_arg)
+        # Verificar que el número de teléfono no esté registrado
+        existing_chat_id = await _get_chat_id_for_phone(phone_number)
+        if existing_chat_id and existing_chat_id != chat_id:
+            await _send_telegram_message(
+                chat_id=chat_id,
+                text=f"El número {phone_number} ya está registrado con otro chat.",
+            )
+            return
     except ValueError:
         await _send_telegram_message(
             chat_id=chat_id,
-            text="Formato inválido. Ejemplo válido: /start +573001112233",
+            text="Formato inválido. Ejemplo válido: /register 3001112233",
         )
         return
 

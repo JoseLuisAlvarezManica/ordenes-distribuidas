@@ -15,7 +15,7 @@ _connection: pika.BlockingConnection | None = None
 def _run_consumer(
     exchange: str,
     queue: str,
-    routing_key: str,
+    routing_keys: list[str],
     on_message: Callable[[pika.adapters.blocking_connection.BlockingChannel, any, any, bytes], None],
 ) -> None:
     global _connection
@@ -25,23 +25,24 @@ def _run_consumer(
     channel = _connection.channel()
     channel.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
     channel.queue_declare(queue=queue, durable=True)
-    channel.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
+    for routing_key in routing_keys:
+        channel.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
     channel.basic_qos(prefetch_count=1)
     channel.basic_consume(queue=queue, on_message_callback=on_message)
-    logger.info("Escuchando '%s' en queue '%s'.", routing_key, queue)
+    logger.info("Escuchando routing_keys=%s en queue '%s'.", routing_keys, queue)
     channel.start_consuming()
 
 
 def start_subscriber(
     exchange: str,
     queue: str,
-    routing_key: str,
+    routing_keys: list[str],
     on_message: Callable[[pika.adapters.blocking_connection.BlockingChannel, any, any, bytes], None],
 ) -> None:
     global _thread
     _thread = threading.Thread(
         target=_run_consumer,
-        args=(exchange, queue, routing_key, on_message),
+        args=(exchange, queue, routing_keys, on_message),
         daemon=True,
         name="rabbit-consumer",
     )

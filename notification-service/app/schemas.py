@@ -27,6 +27,12 @@ class OrderCreatedEvent(BaseModel):
             normalized = f"+{normalized}"
         return normalized
 
+
+class OrderErrorEvent(BaseModel):
+    order_id: str | None = None
+    stage: str
+    error: str | None = None
+
 class NotificationMessage(BaseModel):
     order_id: str
     customer: str

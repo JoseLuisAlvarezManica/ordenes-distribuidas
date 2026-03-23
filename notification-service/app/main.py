@@ -5,14 +5,14 @@ import threading
 import time
 
 import telegram
-from sqlalchemy import String, column, select, table
+from telegram.error import NetworkError, TimedOut
 
 from .config import settings
 from .db import AsyncSessionLocal, engine
-from .models import Base
+from .models import Base, Notification
 from .services.register_user import get_chat_id_by_phone, register_user
 from .services.rabbit_publisher import publish_processing_event
-from .schemas import OrderCreatedEvent
+from .schemas import NotificationMessage, OrderCreatedEvent
 from .services.rabbit_subscriber import start_subscriber
 
 logging.basicConfig(
@@ -34,9 +34,9 @@ _ASYNC_LOOP_READY = threading.Event()
 _ASYNC_RUNTIME_READY = threading.Event()
 
 
-def _build_message(event: OrderCreatedEvent, product_names: dict[str, str]) -> str:
+def _build_message(event: OrderCreatedEvent) -> str:
     items_text = "\n".join(
-        f"{index}) {product_names.get(item.sku, item.sku)}: {item.qty}"
+        f"{index}) {item.sku}: {item.qty}"
         for index, item in enumerate(event.items, start=1)
     )
     if not items_text:
@@ -76,24 +76,19 @@ async def _get_chat_id_for_phone(phone_number: str) -> str | None:
     async with AsyncSessionLocal() as session:
         return await get_chat_id_by_phone(session, phone_number=phone_number)
 
-
-async def _get_product_names_by_sku(skus: list[str]) -> dict[str, str]:
-    if not skus:
-        return {}
-
-    products = table(
-        "products",
-        column("sku", String),
-        column("name", String),
+async def _save_notification(
+    session: AsyncSessionLocal, notification: NotificationMessage
+) -> None:
+    record = Notification(
+        order_id=notification.order_id,
+        customer=notification.customer,
+        event_type=notification.event_type,
+        message=notification.message,
+        reason=notification.reason,
     )
+    session.add(record)
+    await session.commit()
 
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(products.c.sku, products.c.name).where(products.c.sku.in_(skus))
-        )
-        rows = result.all()
-
-    return {sku: name for sku, name in rows}
 
 
 async def notify(event: OrderCreatedEvent) -> None:
@@ -105,13 +100,28 @@ async def notify(event: OrderCreatedEvent) -> None:
         )
         return
 
-    product_names = await _get_product_names_by_sku([item.sku for item in event.items])
-    await _send_telegram_message(chat_id=chat_id, text=_build_message(event, product_names))
+    message_text = _build_message(event)
+    notification = NotificationMessage(
+        order_id=event.order_id,
+        customer=event.customer,
+        event_type="order.created",
+        message=message_text,
+        reason=None,
+    )
 
+    await _send_telegram_message(chat_id=chat_id, text=notification.message)
     logger.info(
-        "Notificación enviada order_id=%s phone_number=%s",
+        "Telegram: mensaje enviado order_id=%s chat_id=%s",
         event.order_id,
-        event.phone_number,
+        chat_id,
+    )
+
+    async with AsyncSessionLocal() as session:
+        await _save_notification(session, notification)
+    logger.info(
+        "DB: notificación persistida order_id=%s customer=%s",
+        event.order_id,
+        event.customer,
     )
 
 
@@ -159,14 +169,25 @@ async def _poll_telegram_updates(stop_event: threading.Event) -> None:
 
     bot = telegram.Bot(settings.telegram_bot_token)
     offset: int | None = None
+    retry_delay = settings.telegram_poll_seconds
 
     async with bot:
-        me = await bot.get_me()
-        logger.info("Bot autenticado: @%s (id=%s)", me.username, me.id)
-
         while not stop_event.is_set():
             try:
-                updates = await bot.get_updates(offset=offset, timeout=30)
+                if offset is None:
+                    me = await bot.get_me(
+                        connect_timeout=settings.telegram_connect_timeout,
+                        read_timeout=settings.telegram_read_timeout,
+                    )
+                    logger.info("Bot autenticado: @%s (id=%s)", me.username, me.id)
+
+                updates = await bot.get_updates(
+                    offset=offset,
+                    timeout=settings.telegram_poll_timeout,
+                    connect_timeout=settings.telegram_connect_timeout,
+                    read_timeout=settings.telegram_read_timeout,
+                )
+                retry_delay = settings.telegram_poll_seconds
                 for update in updates:
                     if isinstance(update.update_id, int):
                         offset = update.update_id + 1
@@ -175,6 +196,16 @@ async def _poll_telegram_updates(stop_event: threading.Event) -> None:
                     if message is None:
                         continue
                     await _process_start_command(message.to_dict())
+            except TimedOut:
+                logger.warning("Timeout en polling de Telegram. Reintentando...")
+            except NetworkError as exc:
+                logger.warning(
+                    "Error de red en Telegram: %s. Reintentando en %.1fs",
+                    exc,
+                    retry_delay,
+                )
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, settings.telegram_retry_backoff_max)
             except Exception as exc:
                 logger.error("Error en polling de Telegram: %s", exc, exc_info=True)
                 await asyncio.sleep(settings.telegram_poll_seconds)
@@ -201,8 +232,8 @@ def _run_async_runtime(stop_event: threading.Event) -> None:
 
 
 async def _init_db() -> None:
-    if not settings.database_url:
-        raise RuntimeError("DATABASE_URL no está configurado")
+    if not settings.postgres_notifications_url:
+        raise RuntimeError("POSTGRES_NOTIFICATIONS_URL no está configurado")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

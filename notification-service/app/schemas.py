@@ -15,6 +15,7 @@ class OrderCreatedEvent(BaseModel):
     phone_number: str
     order_id: str
     items: list[OrderItem]
+    customer: str
 
     @field_validator("phone_number")
     @classmethod
@@ -25,3 +26,10 @@ class OrderCreatedEvent(BaseModel):
         if not normalized.startswith("+"):
             normalized = f"+{normalized}"
         return normalized
+
+class NotificationMessage(BaseModel):
+    order_id: str
+    customer: str
+    event_type: str
+    reason: str | None = None
+    message: str

@@ -5,53 +5,69 @@ logger = logging.getLogger(__name__)
 
 
 class Seeder():
-    def __init__(self, session):
+    def __init__(self, session, redis):
         self.session = session
+        self.redis = redis
+
+        # Formato SKU: NNN-X
+        # E = Electrónica (computadoras, laptops, workstations)
+        # T = Telecomunicaciones (fax, smartphones, routers, switches, servidores)
+        # P = Periféricos (impresoras, teclados, ratones, escáneres, copiadoras, webcams)
+        # A = Audio/Visual (auriculares, monitores, proyectores, smart TVs)
+        # S = Almacenamiento (discos duros, memorias USB)
+        # W = Wearables (smartwatches, rastreadores de actividad)
+        # G = Gaming (cascos VR, consolas de videojuegos)
+        # M = Móviles (tablets)
+
+        self.products = [
+            {'sku': '001-E', 'name': 'Computadora',              'stock': 100},
+            {'sku': '002-T', 'name': 'Máquina de Fax',           'stock': 200},
+            {'sku': '003-E', 'name': 'Laptop',                   'stock': 300},
+            {'sku': '004-P', 'name': 'Impresora',                'stock': 400},
+            {'sku': '005-T', 'name': 'Smartphone',               'stock': 500},
+            {'sku': '006-M', 'name': 'Tablet',                   'stock': 600},
+            {'sku': '007-A', 'name': 'Monitor',                  'stock': 700},
+            {'sku': '008-P', 'name': 'Teclado',                  'stock': 800},
+            {'sku': '009-P', 'name': 'Ratón',                    'stock': 900},
+            {'sku': '010-A', 'name': 'Auriculares',              'stock': 1000},
+            {'sku': '011-P', 'name': 'Webcam',                   'stock': 1100},
+            {'sku': '012-S', 'name': 'Disco Duro Externo',       'stock': 1200},
+            {'sku': '013-S', 'name': 'Memoria USB',              'stock': 1300},
+            {'sku': '014-T', 'name': 'Router',                   'stock': 1400},
+            {'sku': '015-T', 'name': 'Switch',                   'stock': 1500},
+            {'sku': '016-T', 'name': 'Servidor',                 'stock': 1600},
+            {'sku': '017-E', 'name': 'Workstation',              'stock': 1700},
+            {'sku': '018-A', 'name': 'Proyector',                'stock': 1800},
+            {'sku': '019-P', 'name': 'Escáner',                  'stock': 1900},
+            {'sku': '020-P', 'name': 'Copiadora',                'stock': 2000},
+            {'sku': '021-W', 'name': 'Smartwatch',               'stock': 2100},
+            {'sku': '022-W', 'name': 'Rastreador de Actividad',  'stock': 2200},
+            {'sku': '023-G', 'name': 'Casco de Realidad Virtual','stock': 2300},
+            {'sku': '024-G', 'name': 'Consola de Videojuegos',   'stock': 2400},
+            {'sku': '025-A', 'name': 'Smart TV',                 'stock': 2500},
+        ]
     
     async def seed(self):
+        # Seed Base datos
         result = await self.session.execute(text("SELECT COUNT(*) FROM products"))
         count = result.scalar_one()
         logger.info(f"[Seeder] products count: {count}")
         if count == 0:
-            # Insert initial data into inventory
-            # SKU format: NNN-X
-            # E = Electronics (computers, laptops, workstations)
-            # T = Telecommunications (fax, smartphones, routers, switches, servers)
-            # P = Peripherals (printers, keyboards, mice, scanners, copiers, webcams)
-            # A = Audio/Visual (headphones, monitors, projectors, smart TVs)
-            # S = Storage (hard drives, USB drives)
-            # W = Wearables (smartwatches, fitness trackers)
-            # G = Gaming (VR headsets, gaming consoles)
-            # M = Mobile (tablets)
-            await self.session.execute(text("""
-                INSERT INTO products (sku, name, stock) VALUES
-                ('001-E', 'Computer', 100),
-                ('002-T', 'Fax Machine', 200),
-                ('003-E', 'Laptop', 300),
-                ('004-P', 'Printer', 400),
-                ('005-T', 'Smartphone', 500),
-                ('006-M', 'Tablet', 600),
-                ('007-A', 'Monitor', 700),
-                ('008-P', 'Keyboard', 800),
-                ('009-P', 'Mouse', 900),
-                ('010-A', 'Headphones', 1000),
-                ('011-P', 'Webcam', 1100),
-                ('012-S', 'External Hard Drive', 1200),
-                ('013-S', 'USB Flash Drive', 1300),
-                ('014-T', 'Router', 1400),
-                ('015-T', 'Switch', 1500),
-                ('016-T', 'Server', 1600),
-                ('017-E', 'Workstation', 1700),
-                ('018-A', 'Projector', 1800),
-                ('019-P', 'Scanner', 1900),
-                ('020-P', 'Copier', 2000),
-                ('021-W', 'Smartwatch', 2100),
-                ('022-W', 'Fitness Tracker', 2200),
-                ('023-G', 'VR Headset', 2300),
-                ('024-G', 'Gaming Console', 2400),
-                ('025-A', 'Smart TV', 2500)
-            """))
+            for product in self.products:
+                await self.session.execute(text(f"""
+                    INSERT INTO products (sku, name, stock) VALUES
+                    ('{product['sku']}', '{product['name']}', {product['stock']})
+                """))
             await self.session.commit()
+            
             logger.info("[Seeder] Seed completed successfully.")
         else:
             logger.info("[Seeder] Products already seeded, skipping.")
+        
+        # Seed Redis
+        try:
+            for product in self.products:
+                if not await self.redis.exists(product['sku']):
+                    await self.redis.hset(product['sku'], mapping={"name": product['name']})             
+        except Exception as exc:
+            logger.error(f"[Seeder] Redis error: {exc}", exc_info=True)

@@ -84,12 +84,17 @@ async def create_internal_order(
 
     try:
         publish_started = time.perf_counter()
+        item_names = {}
+        for item in order.items:
+            product_name = await redis.hget(item.sku, "name")
+            item_names[item.sku] = product_name if product_name else item.sku
         await publisher.publish_order_created(
             {
                 "order_id": str(order.order_id),
                 "customer": order.customer,
                 "phone_number": order.phone_number,
                 "items": [{"sku": item.sku, "qty": item.qty} for item in order.items],
+                "names": item_names,
                 "persist_ms": round(persist_ms, 2),
             }
         )

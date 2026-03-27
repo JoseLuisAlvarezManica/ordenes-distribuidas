@@ -25,12 +25,15 @@ logging.getLogger("pika").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    #Crear tablas en la bd
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Seed Base datos y redis
     try:
+        redis = await get_redis()
         async with AsyncSessionLocal() as session:
-            seeder = Seeder(session)
+            seeder = Seeder(session, redis)
             await seeder.seed()
     except Exception as exc:
         logger.error(f"[Seeder] Error: {exc}", exc_info=True)

@@ -15,6 +15,7 @@ class OrderCreatedEvent(BaseModel):
     phone_number: str
     order_id: str
     items: list[OrderItem]
+    names: dict[str, str]
     customer: str
 
     @field_validator("phone_number")

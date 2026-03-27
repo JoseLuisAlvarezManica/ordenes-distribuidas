@@ -37,7 +37,7 @@ _ASYNC_RUNTIME_READY = threading.Event()
 
 def _build_message(event: OrderCreatedEvent) -> str:
     items_text = "\n".join(
-        f"{index}) {item.sku}: {item.qty}"
+        f"{index}) {event.names.get(item.sku, item.sku)}: {item.qty}"
         for index, item in enumerate(event.items, start=1)
     )
     if not items_text:

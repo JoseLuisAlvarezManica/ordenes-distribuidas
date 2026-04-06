@@ -1,0 +1,23 @@
+services:
+  api-gateway:
+    ports:
+      - "8081:8000"
+    environment:
+      LOG_LEVEL: INFO
+    restart: unless-stopped
+
+  writer-service:
+    restart: unless-stopped
+
+  inventory-service:
+    restart: unless-stopped
+
+  notification-service:
+    restart: unless-stopped
+
+  telegram-bot:
+    restart: unless-stopped
+
+  analytics-service:
+    restart: unless-stopped
+

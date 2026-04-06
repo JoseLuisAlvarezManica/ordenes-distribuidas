@@ -1,0 +1,33 @@
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+  postgres-notifications:
+    ports:
+      - "5434:5432"
+  redis:
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    ports:
+      - "5672:5672"
+
+  api-gateway:
+    ports:
+      - "8000:8000"
+    environment:
+      LOG_LEVEL: DEBUG
+
+  writer-service:
+    ports:
+      - "8001:8001"
+
+  telegram-bot:
+    ports:
+      - "8003:8003"
+
+  analytics-service:
+    ports:
+      - "8002:8002"
+

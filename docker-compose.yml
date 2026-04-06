@@ -95,6 +95,17 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      telegram-bot:
+        condition: service_started
+
+  telegram-bot:
+    build: ./telegram-bot
+    env_file: .env
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres-notifications:
+        condition: service_healthy
 
   analytics-service:
     build: ./analytics-service

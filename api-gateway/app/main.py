@@ -27,6 +27,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="api-gateway", lifespan=lifespan)
 app.include_router(orders_router)
 
+@app.get("/", tags=["root"])
+async def root():
+    return {"message": "Sistema de ordenes MIA"}
+
+
 @app.get("/health", tags=["ops"])
 async def health(redis: redis_dependency) -> JSONResponse:
     checks: dict[str, str] = {}

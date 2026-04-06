@@ -133,7 +133,8 @@ distributed-orders/
 | **api-gateway**    | 8000   | API pública – recibe y consulta órdenes |
 | **writer-service** | 8001   | Servicio interno – persiste en Postgres |
 | **analytics-service** | 8002 | API de analítica en tiempo real de eventos de órdenes |
-| **notification-service** | - | Worker de RabbitMQ + bot de Telegram |
+| **notification-service** | - | Worker de RabbitMQ para notificaciones de órdenes |
+| **telegram-bot** | - | Bot de Telegram para registro de chats (`/start <telefono>`) |
 | **postgres**       | 5432   | Base de datos relacional                |
 | **redis**          | 6379   | Caché de estado de órdenes              |
 
@@ -202,6 +203,7 @@ Definidas en `.env` y compartidas vía `docker-compose.yml`:
 | `WRITER_MAX_RETRIES`     | `1`                                                                    |
 | `RABBITMQ_URL`           | `amqp://superuser:superpassword@rabbitmq:5672/`                        |
 | `TELEGRAM_BOT_TOKEN`     | Token del bot de Telegram                                               |
+| `TELEGRAM_BOT_SERVICE_URL` | URL interna del servicio telegram-bot (default: `http://telegram-bot:8003`) |
 | `TELEGRAM_POLL_SECONDS`  | Intervalo de reintento del polling de Telegram (default: `2`)          |
 
 ---

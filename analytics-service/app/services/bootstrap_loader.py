@@ -11,7 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_dsn(raw_url: str) -> str:
-    return raw_url.replace("postgresql+asyncpg://", "postgresql://")
+    if raw_url.startswith("postgres://"):
+        return raw_url.replace("postgres://", "postgresql://", 1)
+    if raw_url.startswith("postgresql+asyncpg://"):
+        return raw_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    if raw_url.startswith("postgresql+psycopg2://"):
+        return raw_url.replace("postgresql+psycopg2://", "postgresql://", 1)
+    return raw_url
 
 
 def _items_to_list(raw_items: Any) -> list[dict[str, Any]]:

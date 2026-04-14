@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     rabbitmq_url: str = os.getenv("RABBITMQ_URL", "")
     database_url: str = os.getenv("DATABASE_URL", "")
+    analytics_admin_token: str = os.getenv("ANALYTICS_ADMIN_TOKEN", "")
 
 
 settings = Settings()

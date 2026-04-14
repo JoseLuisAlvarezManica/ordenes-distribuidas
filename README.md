@@ -157,7 +157,7 @@ distributed-orders/
 
 | Método | Ruta         | Descripción |
 | ------ | ------------ | ----------- |
-| `GET`  | `/analytics` | Devuelve productos más pedidos, cliente más frecuente, porcentaje de errores y tiempos promedio de persistencia/publicación/notificación |
+| `GET`  | `/analytics` | Devuelve productos más pedidos, cliente más frecuente, porcentaje de errores y tiempos promedio de persistencia/publicación/notificación. Requiere `Authorization: Bearer <ANALYTICS_ADMIN_TOKEN>` |
 
 ## Características distribuidas
 
@@ -181,7 +181,8 @@ curl -X POST http://localhost:8000/orders \
 curl http://localhost:8000/orders/<order_id>
 
 # Consultar analitica agregada
-curl http://localhost:8002/analytics
+curl http://localhost:8002/analytics \
+    -H "Authorization: Bearer <ANALYTICS_ADMIN_TOKEN>"
 
 # En Telegram, registrar tu chat con tu teléfono
 # /start +573001112233
@@ -202,6 +203,7 @@ Definidas en `.env` y compartidas vía `docker-compose.yml`:
 | `WRITER_TIMEOUT_SECONDS` | `1.0`                                                                  |
 | `WRITER_MAX_RETRIES`     | `1`                                                                    |
 | `RABBITMQ_URL`           | `amqp://superuser:superpassword@rabbitmq:5672/`                        |
+| `ANALYTICS_ADMIN_TOKEN`  | Token requerido para acceder al endpoint privado `GET /analytics`      |
 | `TELEGRAM_BOT_TOKEN`     | Token del bot de Telegram                                               |
 | `TELEGRAM_BOT_SERVICE_URL` | URL interna del servicio telegram-bot (default: `http://telegram-bot:8003`) |
 | `TELEGRAM_POLL_SECONDS`  | Intervalo de reintento del polling de Telegram (default: `2`)          |

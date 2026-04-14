@@ -1,8 +1,11 @@
 import logging
+import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from .config import settings
 from .schemas import OrderCreatedEvent, OrderErrorEvent, OrderProcessingEvent
 from .services.aggregator import AnalyticsAggregator
 from .services.bootstrap_loader import preload_business_metrics_from_orders
@@ -21,6 +24,32 @@ QUEUE = "analytics.order.events"
 ROUTING_KEYS = ["order.created", "order.error", "order.processing"]
 
 aggregator = AnalyticsAggregator()
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def require_admin_access(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> None:
+    expected_token = settings.analytics_admin_token.strip()
+    if not expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Analytics endpoint no disponible por configuración de seguridad.",
+        )
+
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autorizado.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not secrets.compare_digest(credentials.credentials, expected_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autorizado.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 def on_order_event(channel, method, properties, body: bytes) -> None:
@@ -70,5 +99,5 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/analytics", tags=["analytics"])
-async def get_analytics() -> dict:
+async def get_analytics(_: None = Depends(require_admin_access)) -> dict:
     return aggregator.snapshot()

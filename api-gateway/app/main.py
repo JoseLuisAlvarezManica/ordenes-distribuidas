@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import FastAPI, status, Depends
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 import redis.asyncio as aioredis
 from .redis_client import close_redis, get_redis
@@ -25,6 +26,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="api-gateway", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(orders_router)
 
 @app.get("/", tags=["root"])

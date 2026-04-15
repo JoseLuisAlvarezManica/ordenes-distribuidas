@@ -6,5 +6,6 @@ class User(BaseModel):
     email: str
     phone_number: str
     password: str
+    role: str
 
 

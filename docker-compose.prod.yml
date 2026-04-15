@@ -4,6 +4,9 @@ services:
 
   postgres-notifications:
     restart: always
+  
+  postgres-auth:
+    restart: always
 
   redis:
     restart: always

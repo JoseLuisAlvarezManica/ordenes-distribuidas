@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 import redis.asyncio as aioredis
 from .redis_client import close_redis, get_redis
 from .routes.orders import router as orders_router
+from .routes.auth import router as auth_router
 
 import logging
 
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="api-gateway", lifespan=lifespan)
 app.include_router(orders_router)
+app.include_router(auth_router)
 
 @app.get("/", tags=["root"])
 async def root():

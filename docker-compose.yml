@@ -24,7 +24,7 @@ services:
       interval: 5s
       retries: 5
 
-    postgres-auth:
+  postgres-auth:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_AUTH_USER}
@@ -69,6 +69,18 @@ services:
         condition: service_healthy
       writer-service:
         condition: service_started
+      auth-service:
+        condition: service_started
+
+  auth-service:
+    build: ./auth-service
+    env_file: ${ENV_FILE:-.env.dev}
+    restart: on-failure
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   writer-service:
     build: ./writer-service

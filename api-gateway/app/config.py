@@ -7,6 +7,8 @@ class Settings(BaseSettings):
 
     redis_url: str = os.getenv("REDIS_URL")
 
+    auth_service_url: str = os.getenv("AUTH_SERVICE_URL")
+
     writer_service_url: str = os.getenv("WRITER_SERVICE_URL")
     writer_timeout_seconds: float = os.getenv("WRITER_TIMEOUT_SECONDS")
     writer_max_retries: int = os.getenv("WRITER_MAX_RETRIES")

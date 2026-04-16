@@ -238,3 +238,67 @@ Si el consumer no hace ni ack ni nack y se desconecta, RabbitMQ reencola el mens
 `Callable` es un tipo de Python que representa cualquier objeto que se puede llamar como función: funciones normales, lambdas, métodos, o clases con `__call__`.
 
 Se usa en `rabbit_subscriber.py` para declarar que `on_message` es un parámetro que acepta una función con una firma específica
+
+## Python-JOSE
+
+Biblioteca para crear y firmar JSON Web Tokens en Python. Se utilizó junto con un par de llaves RSA para firmar y verificar los JWT con el algoritmo RS256 (asimétrico): el auth-service firma con la clave privada y el api-gateway verifica con la clave pública sin necesidad de compartir el secreto.
+
+Generación del par de llaves:
+
+```bash
+# Clave privada RSA de 2048 bits
+openssl genrsa -out private.pem 2048
+
+# Clave pública derivada
+openssl rsa -in private.pem -pubout -out public.pem
+```
+
+Los valores de `private.pem` y `public.pem` se pasan a los servicios como variables de entorno `PRIVATE_KEY` y `PUBLIC_KEY`.
+
+## Passlib
+
+Biblioteca de hashing de contraseñas. Se utilizó el esquema `bcrypt`, que incorpora un salt aleatorio y un factor de costo que hace el hash computacionalmente costoso, dificultando ataques de fuerza bruta.
+
+## Pruebas sign up, login y logout
+
+**Registro de usuario:**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Juan Perez","email":"juan@mail.com","phone_number":"+521234567890","password":"supersecret123"}'
+```
+
+**Login y captura del token:**
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@mail.com","password":"supersecret123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+echo $TOKEN
+```
+
+**Logout (invalida el token en Redis):**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Registro duplicado (debe retornar 409):**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Juan Perez","email":"juan@mail.com","phone_number":"+521234567890","password":"supersecret123"}'
+```
+
+**Login con contraseña incorrecta (debe retornar 401):**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@mail.com","password":"wrongpassword"}'
+```

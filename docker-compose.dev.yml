@@ -7,7 +7,7 @@ services:
       - "5434:5432"
   postgres-auth:
     ports:
-      - "5434:5432"
+      - "5435:5432"
 
   redis:
     ports:
@@ -34,4 +34,8 @@ services:
   analytics-service:
     ports:
       - "8002:8002"
+
+  auth-service:
+    ports:
+      - "8004:8004"
 

@@ -2,8 +2,32 @@ from uuid import UUID
 import re
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+
+class SignUpRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=1, max_length=150)
+    email: EmailStr
+    phone_number: str = Field(..., min_length=8, max_length=16)
+    password: str = Field(..., min_length=8)
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    email: EmailStr
+    password: str = Field(..., min_length=1)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class MessageResponse(BaseModel):
+    detail: str
 
 SKU_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
 PHONE_PATTERN = re.compile(r"^\+?[1-9]\d{7,14}$")

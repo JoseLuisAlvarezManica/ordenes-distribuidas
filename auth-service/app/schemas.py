@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 class SignUp(BaseModel):
     name: str
@@ -11,10 +11,21 @@ class Login(BaseModel):
     password: str
 
 class User(BaseModel):
-    name: str
-    email: str
-    phone_number: str
-    password: str
+    username: str
+    email: EmailStr
+    phone_number: str | None = None
+    role: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class MeResponse(BaseModel):
+    username: str
+    email: EmailStr
+    phone_number: str | None = None
     role: str
 
 

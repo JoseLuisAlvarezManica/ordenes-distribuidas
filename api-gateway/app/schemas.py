@@ -29,6 +29,13 @@ class TokenResponse(BaseModel):
 class MessageResponse(BaseModel):
     detail: str
 
+
+class MeResponse(BaseModel):
+    username: str
+    email: EmailStr
+    phone_number: str | None = None
+    role: str
+
 SKU_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
 PHONE_PATTERN = re.compile(r"^\+?[1-9]\d{7,14}$")
 

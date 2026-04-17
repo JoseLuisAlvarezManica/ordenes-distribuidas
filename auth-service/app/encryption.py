@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import textwrap
+from uuid import uuid4
 
 from jose import jwt
 from passlib.context import CryptContext
@@ -46,9 +47,17 @@ async def authenticate_user(email: str, password: str, db: AsyncSession):
 
 
 def create_access_token(username: str, email: str, role: str, phone_number: str, expires_delta: timedelta) -> str:
-    payload = {"sub": username, "email": email, "role": role, "phone_number": phone_number}
-    expires = datetime.now(timezone.utc) + expires_delta
-    payload.update({"exp": expires})
+    issued_at = datetime.now(timezone.utc)
+    expires = issued_at + expires_delta
+    payload = {
+        "sub": username,
+        "email": email,
+        "role": role,
+        "phone_number": phone_number,
+        "iat": issued_at,
+        "exp": expires,
+        "jti": str(uuid4()),
+    }
     return jwt.encode(payload, _PRIVATE_KEY, algorithm=ALGORITHM)
 
 

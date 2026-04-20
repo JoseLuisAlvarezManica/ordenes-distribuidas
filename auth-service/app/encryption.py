@@ -17,10 +17,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def _wrap_pem(key: str, key_type: str) -> str:
     """Envuelve una llave base64 sin headers en formato PEM completo."""
-    key = key.strip().replace(" ", "").replace("\n", "")
+    # Railway (y otros CIs) pueden almacenar \n como literales; los convertimos primero
+    key = key.replace("\\n", "\n").strip()
     if key.startswith("-----"):
         return key
-    body = "\n".join(textwrap.wrap(key, 64))
+    # Eliminar cualquier espacio/newline del cuerpo base64 para reformatearlo limpiamente
+    body_raw = key.replace("\n", "").replace(" ", "")
+    body = "\n".join(textwrap.wrap(body_raw, 64))
     return f"-----BEGIN {key_type}-----\n{body}\n-----END {key_type}-----"
 
 

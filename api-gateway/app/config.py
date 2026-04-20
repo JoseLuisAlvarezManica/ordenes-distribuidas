@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     writer_timeout_seconds: float = os.getenv("WRITER_TIMEOUT_SECONDS")
     writer_max_retries: int = os.getenv("WRITER_MAX_RETRIES")
     support_number: str | None = os.getenv("SUPPORT_NUMBER")
+    public_key: str = os.getenv("PUBLIC_KEY")
 
 
 settings = Settings()

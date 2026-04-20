@@ -24,10 +24,10 @@ async def lifespan(app: FastAPI):
     yield
     await close_redis()
 
-
 app = FastAPI(title="api-gateway", lifespan=lifespan)
 app.include_router(orders_router)
 app.include_router(auth_router)
+
 
 @app.get("/", tags=["root"])
 async def root():

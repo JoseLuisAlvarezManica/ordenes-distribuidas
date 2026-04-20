@@ -4,6 +4,9 @@ services:
 
   postgres-notifications:
     restart: always
+  
+  postgres-auth:
+    restart: always
 
   redis:
     restart: always
@@ -54,4 +57,10 @@ services:
         limits:
           memory: 512M
 
+  auth-service:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 

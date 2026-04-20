@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import redis.asyncio as aioredis
 from .redis_client import close_redis, get_redis
 from .routes.orders import router as orders_router
+from .routes.auth import router as auth_router
 
 import logging
 
@@ -24,7 +25,6 @@ async def lifespan(app: FastAPI):
     yield
     await close_redis()
 
-
 app = FastAPI(title="api-gateway", lifespan=lifespan)
 
 app.add_middleware(
@@ -36,6 +36,8 @@ app.add_middleware(
 )
 
 app.include_router(orders_router)
+app.include_router(auth_router)
+
 
 @app.get("/", tags=["root"])
 async def root():

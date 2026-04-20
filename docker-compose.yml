@@ -24,6 +24,19 @@ services:
       interval: 5s
       retries: 5
 
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_AUTH_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_AUTH_DB}
+    volumes:
+      - pg_data_auth:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_AUTH_USER} -d ${POSTGRES_AUTH_DB}"]
+      interval: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     volumes:
@@ -56,6 +69,18 @@ services:
         condition: service_healthy
       writer-service:
         condition: service_started
+      auth-service:
+        condition: service_started
+
+  auth-service:
+    build: ./auth-service
+    env_file: ${ENV_FILE:-.env.dev}
+    restart: on-failure
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   writer-service:
     build: ./writer-service
@@ -113,4 +138,5 @@ volumes:
   rabbitmq_data:
   rabbitmq_log:
   pg_data_notifications:
+  pg_data_auth:
 

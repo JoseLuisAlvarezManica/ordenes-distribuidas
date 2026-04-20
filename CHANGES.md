@@ -238,3 +238,173 @@ Si el consumer no hace ni ack ni nack y se desconecta, RabbitMQ reencola el mens
 `Callable` es un tipo de Python que representa cualquier objeto que se puede llamar como función: funciones normales, lambdas, métodos, o clases con `__call__`.
 
 Se usa en `rabbit_subscriber.py` para declarar que `on_message` es un parámetro que acepta una función con una firma específica
+
+## Python-JOSE
+
+Biblioteca para crear y firmar JSON Web Tokens en Python. Se utilizó junto con un par de llaves RSA para firmar y verificar los JWT con el algoritmo RS256 (asimétrico): el auth-service firma con la clave privada y el api-gateway verifica con la clave pública sin necesidad de compartir el secreto.
+
+Generación del par de llaves:
+
+```bash
+# Clave privada RSA de 2048 bits
+openssl genrsa -out private.pem 2048
+
+# Clave pública derivada
+openssl rsa -in private.pem -pubout -out public.pem
+```
+
+Los valores de `private.pem` y `public.pem` se pasan a los servicios como variables de entorno `PRIVATE_KEY` y `PUBLIC_KEY`.
+
+## Passlib
+
+Biblioteca de hashing de contraseñas. Se utilizó el esquema `bcrypt`, que incorpora un salt aleatorio y un factor de costo que hace el hash computacionalmente costoso, dificultando ataques de fuerza bruta.
+
+## Pruebas sign up, login y logout
+
+**Registro de usuario:**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Juan Perez","email":"juan@mail.com","phone_number":"+521234567890","password":"supersecret123"}'
+```
+
+**Login y captura del token:**
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@mail.com","password":"supersecret123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+echo $TOKEN
+```
+
+**Logout (invalida el token en Redis):**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Registro duplicado (debe retornar 409):**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Juan Perez","email":"juan@mail.com","phone_number":"+521234567890","password":"supersecret123"}'
+```
+
+**Login con contraseña incorrecta (debe retornar 401):**
+
+```bash
+curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@mail.com","password":"wrongpassword"}'
+```
+
+## Auth: endpoint /refresh y /me
+
+- renovar el token sin pedir credenciales otra vez (`/refresh`),
+- obtener la informacion del usuario autenticado (`/me`).
+
+
+### Solucion implementada
+
+Se hicieron cambios en `auth-service` y en `api-gateway` para que funcionen de extremo a extremo.
+
+1. `auth-service/app/routes/users.py`
+
+- Se agrego una validacion centralizada de Bearer token:
+  - decodifica JWT con llave publica,
+  - revisa en Redis si el token esta en blacklist (`blacklist:<token>`),
+  - rechaza token invalido o revocado con `401`.
+- Se implemento `POST /auth/refresh`:
+  - usa los claims del token actual (`sub`, `email`, `role`, `phone_number`),
+  - genera un nuevo `access_token` con la expiracion configurada,
+  - envia el token anterior a blacklist en Redis para invalidarlo inmediatamente,
+  - devuelve `200` con `{ access_token, token_type }`.
+- Se implemento `GET /auth/me`:
+  - toma el email del token validado,
+  - consulta el usuario en Postgres,
+  - devuelve `200` con `username`, `email`, `phone_number`, `role`.
+- `logout` ahora reutiliza la misma validacion de token y mantiene la revocacion en Redis con TTL hasta la expiracion del JWT.
+
+2. `auth-service/app/schemas.py`
+
+- Se agregaron modelos de respuesta:
+  - `TokenResponse` para login/refresh,
+  - `MeResponse` para `/me`.
+
+3. `api-gateway/app/routes/auth.py`
+
+- Se agrego `POST /auth/refresh` que reenvia el header `Authorization` al `auth-service`.
+- Se agrego `GET /auth/me` que reenvia el header `Authorization` al `auth-service`.
+
+4. `api-gateway/app/schemas.py`
+
+- Se agrego `MeResponse` para tipar la respuesta del endpoint `/auth/me` en el gateway.
+
+### Como probar
+
+Prueba recomendada via API Gateway (`http://localhost:8000`):
+
+1. Login y captura de token:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@mail.com","password":"supersecret123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+echo $TOKEN
+```
+
+2. Consultar usuario autenticado:
+
+```bash
+curl -s -X GET http://localhost:8000/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Resultado esperado: `200` con `username`, `email`, `phone_number`, `role`.
+
+3. Renovar token:
+
+```bash
+NEW_TOKEN=$(curl -s -X POST http://localhost:8000/auth/refresh \
+  -H "Authorization: Bearer $TOKEN" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+echo $NEW_TOKEN
+```
+
+Resultado esperado: `200` con un nuevo `access_token`.
+
+4. Verificar que el nuevo token funciona en `/me`:
+
+```bash
+curl -s -X GET http://localhost:8000/auth/me \
+  -H "Authorization: Bearer $NEW_TOKEN"
+```
+
+Resultado esperado: `200` con la misma informacion del usuario.
+
+5. Verificar que el token anterior ya no es valido despues de refresh:
+
+```bash
+curl -s -X GET http://localhost:8000/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Resultado esperado: `401` con mensaje de token revocado.
+
+6. Logout y validacion de revocacion:
+
+```bash
+curl -s -X POST http://localhost:8000/auth/logout \
+  -H "Authorization: Bearer $NEW_TOKEN"
+
+curl -s -X POST http://localhost:8000/auth/refresh \
+  -H "Authorization: Bearer $NEW_TOKEN"
+```

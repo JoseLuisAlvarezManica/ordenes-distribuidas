@@ -3,8 +3,9 @@ from typing import Annotated
 from uuid import UUID, uuid4
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from ..decorators import must_be_logged_in, bearer_scheme
 from ..config import settings
 from ..redis_client import get_redis
 from ..schemas import CreateOrderRequest, CreateOrderResponse, OrderStatusResponse
@@ -16,13 +17,15 @@ writer_dependency = Annotated[WriterClient, Depends(get_writer_client)]
 redis_dependency = Annotated[aioredis.Redis, Depends(get_redis)]
 
 
-@router.post("/", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(bearer_scheme)])
+@must_be_logged_in
 async def create_order(
+    request: Request,
     order_data: CreateOrderRequest,
     writer_client: writer_dependency,
     redis: redis_dependency,
 ) -> CreateOrderResponse:
-    phone_number = order_data.phone_number or settings.support_number
+    phone_number = request.state.phone_number or settings.support_number
     if not phone_number:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -40,7 +43,7 @@ async def create_order(
         
         order_payload = {
             "order_id": order_id,
-            "customer": order_data.customer,
+            "customer": request.state.username,
             "phone_number": phone_number,
             "items": [{"sku": item.sku, "qty": item.qty} for item in order_data.items],
         }
@@ -57,8 +60,9 @@ async def create_order(
     return CreateOrderResponse(order_id=order_id, status="RECEIVED")
 
 
-@router.get("/{id}", status_code=status.HTTP_200_OK)
-async def get_order(id: UUID, redis: redis_dependency) -> OrderStatusResponse:
+@router.get("/{id}", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
+@must_be_logged_in
+async def get_order(request: Request, id: UUID, redis: redis_dependency) -> OrderStatusResponse:
     raw = await redis.execute_command("HGETALL", f"order:{id}")
 
     if isinstance(raw, dict):

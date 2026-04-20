@@ -21,3 +21,5 @@ services:
   analytics-service:
     restart: unless-stopped
 
+  auth-service:
+    restart: unless-stopped

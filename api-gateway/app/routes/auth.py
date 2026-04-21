@@ -21,6 +21,13 @@ async def signup(body: SignUpRequest, auth_client: auth_dependency):
         raise HTTPException(status_code=code, detail=data)
     return data
 
+@router.post("/admin/register", status_code=status.HTTP_201_CREATED, response_model=MessageResponse)
+async def signup(body: SignUpRequest, auth_client: auth_dependency):
+    code, data = await auth_client.post("/auth/admin/register", body.model_dump())
+    if code != status.HTTP_201_CREATED:
+        raise HTTPException(status_code=code, detail=data)
+    return data
+
 
 @router.post("/login", status_code=status.HTTP_200_OK, response_model=TokenResponse)
 async def login(body: LoginRequest, auth_client: auth_dependency):

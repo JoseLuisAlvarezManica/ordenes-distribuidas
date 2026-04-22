@@ -1,25 +1,28 @@
-name: CI   #Nombre del Workflow
-on: #Eventos que disparan el workflow
+name: CI
+
+on:
   push:
-    branches: [ main ] #Rama en la que se ejecutara el workflow
-  
-  pull_request:  
-    branches: [ main ] #Rama en la que se ejecutara el workflow
+    branches: [features/QA]
+  pull_request:
+    branches: [features/QA]
 
 jobs:
-  build-and-test: #Nombre del job
-    runs-on: ubuntu-latest #Runner (maquina virtual) donde se ejecutara el job
-    timeout-minutes: 10
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
       - name: Checkout code
-      - uses: actions/checkout@v4 #Paso 1: Clonar el repositorio
-      
-      - name: Build all services
-        run: docker compose build
-      
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Create .env from GitHub Secrets
         run: |
-          cat > .env << EOF
+          cat > .env << 'EOF'
           ENV_FILE=.env
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
@@ -52,36 +55,36 @@ jobs:
           ACCESS_TOKEN_EXPIRE_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
           LOG_LEVEL=${{ secrets.LOG_LEVEL }}
           EOF
-      
+
+      - name: Install auth test dependencies
+        run: pip install -r .github/workflows/test_auth/requirements.txt
+
       - name: Start services
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env up --build -d
+
+      - name: Wait for auth-service
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env up --build -d
-      
-      - name: Wait for services to be healthy
-        run: |
-          echo "Esperando a que los servicios esten sanos"
-          timeout 120 bash -c '
-            until docker compose ps --format json | python3 -c "
-            import sys, json
-            services = [json.loads(line) for line in sys.stdin]
-            unhealthy = [s[\"Name\"] for s in services if s.get(\"Health\") not in (\"healthy\", \"\")]
-            if unhealthy:
-                print(f\"Esperando: {unhealthy}\")
-                sys.exit(1)
-            print(\"Todos los servicios estan sanos\")
-            "; do
+          timeout 180 bash -c '
+            until curl -fsS http://localhost:8004/health > /dev/null; do
+              echo "Esperando auth-service en puerto 8004..."
               sleep 5
             done
           '
-      - name: Run Integration Tests
-        run: |
-          chmod +x ./scripts/test.sh
-          ./scripts/test.sh
-        
+
+      - name: Run auth workflow tests
+        env:
+          AUTH_TEST_BASE_URL: http://localhost:8004
+          AUTH_TEST_DB_HOST: localhost
+          AUTH_TEST_DB_PORT: "5435"
+          AUTH_TEST_REDIS_HOST: localhost
+          AUTH_TEST_REDIS_PORT: "6379"
+          AUTH_TEST_REDIS_DB: "0"
+        run: python -m unittest discover -s .github/workflows/test_auth -p "test_*.py" -v
+
       - name: Show logs on failure
         if: failure()
-        run: docker compose logs --tail=100
-      
-      - name: cleanup
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env logs --tail=200
+
+      - name: Cleanup
         if: always()
-        run: docker compose down -v
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env down -v --remove-orphans

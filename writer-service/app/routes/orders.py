@@ -155,7 +155,7 @@ async def get_my_orders(request: Request, db: AsyncSession = Depends(get_db)):
     return orders
 
 
-@router.get("/", status_code=status.HTTP_200_OK)
+@router.get("", status_code=status.HTTP_200_OK)
 async def list_orders(db: AsyncSession = Depends(get_db)):
     orders = await list_all_orders(db)
     return orders

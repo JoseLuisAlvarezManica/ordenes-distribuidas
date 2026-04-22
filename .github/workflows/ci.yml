@@ -1,9 +1,87 @@
 name: CI   #Nombre del Workflow
-on: [push, pull_request]  #Eventos que disparana el workflow
+on: #Eventos que disparan el workflow
+  push:
+    branches: [ main ] #Rama en la que se ejecutara el workflow
+  
+  pull_request:  
+    branches: [ main ] #Rama en la que se ejecutara el workflow
 
 jobs:
-  test: #Nombre del job
+  build-and-test: #Nombre del job
     runs-on: ubuntu-latest #Runner (maquina virtual) donde se ejecutara el job
+    timeout-minutes: 10
     steps:
+      - name: Checkout code
       - uses: actions/checkout@v4 #Paso 1: Clonar el repositorio
-      - run: echo "Hola CI" #Paso 2: Ejecutar un comando
+      
+      - name: Build all services
+        run: docker compose build
+      
+      - name: Create .env from GitHub Secrets
+        run: |
+          cat > .env << EOF
+          ENV_FILE=.env
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          POSTGRES_NOTIFICATIONS_USER=${{ secrets.POSTGRES_NOTIFICATIONS_USER }}
+          POSTGRES_NOTIFICATIONS_PASSWORD=${{ secrets.POSTGRES_NOTIFICATIONS_PASSWORD }}
+          POSTGRES_NOTIFICATIONS_DB=${{ secrets.POSTGRES_NOTIFICATIONS_DB }}
+          POSTGRES_NOTIFICATIONS_URL=${{ secrets.POSTGRES_NOTIFICATIONS_URL }}
+          POSTGRES_AUTH_USER=${{ secrets.POSTGRES_AUTH_USER }}
+          POSTGRES_AUTH_PASSWORD=${{ secrets.POSTGRES_AUTH_PASSWORD }}
+          POSTGRES_AUTH_DB=${{ secrets.POSTGRES_AUTH_DB }}
+          POSTGRES_AUTH_URL=${{ secrets.POSTGRES_AUTH_URL }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          WRITER_SERVICE_URL=${{ secrets.WRITER_SERVICE_URL }}
+          AUTH_SERVICE_URL=${{ secrets.AUTH_SERVICE_URL }}
+          ANALYTICS_SERVICE_URL=${{ secrets.ANALYTICS_SERVICE_URL }}
+          WRITER_TIMEOUT_SECONDS=${{ secrets.WRITER_TIMEOUT_SECONDS }}
+          WRITER_MAX_RETRIES=${{ secrets.WRITER_MAX_RETRIES }}
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
+          RABBITMQ_PORT=${{ secrets.RABBITMQ_PORT }}
+          RABBITMQ_URL=${{ secrets.RABBITMQ_URL }}
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          SUPPORT_NUMBER=${{ secrets.SUPPORT_NUMBER }}
+          ANALYTICS_ADMIN_TOKEN=${{ secrets.ANALYTICS_ADMIN_TOKEN }}
+          TELEGRAM_BOT_SERVICE_URL=${{ secrets.TELEGRAM_BOT_SERVICE_URL }}
+          PRIVATE_KEY=${{ secrets.PRIVATE_KEY }}
+          PUBLIC_KEY=${{ secrets.PUBLIC_KEY }}
+          ACCESS_TOKEN_EXPIRE_MINUTES=${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          LOG_LEVEL=${{ secrets.LOG_LEVEL }}
+          EOF
+      
+      - name: Start services
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env up --build -d
+      
+      - name: Wait for services to be healthy
+        run: |
+          echo "Esperando a que los servicios esten sanos"
+          timeout 120 bash -c '
+            until docker compose ps --format json | python3 -c "
+            import sys, json
+            services = [json.loads(line) for line in sys.stdin]
+            unhealthy = [s[\"Name\"] for s in services if s.get(\"Health\") not in (\"healthy\", \"\")]
+            if unhealthy:
+                print(f\"Esperando: {unhealthy}\")
+                sys.exit(1)
+            print(\"Todos los servicios estan sanos\")
+            "; do
+              sleep 5
+            done
+          '
+      - name: Run Integration Tests
+        run: |
+          chmod +x ./scripts/test.sh
+          ./scripts/test.sh
+        
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+      
+      - name: cleanup
+        if: always()
+        run: docker compose down -v

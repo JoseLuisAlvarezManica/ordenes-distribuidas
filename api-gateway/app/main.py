@@ -9,6 +9,7 @@ import redis.asyncio as aioredis
 from .redis_client import close_redis, get_redis
 from .routes.orders import router as orders_router
 from .routes.auth import router as auth_router
+from .routes.analytics import router as analytics_router
 
 import logging
 
@@ -37,6 +38,7 @@ app.add_middleware(
 
 app.include_router(orders_router)
 app.include_router(auth_router)
+app.include_router(analytics_router)
 
 
 @app.get("/", tags=["root"])

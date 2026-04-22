@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from ..decorators import must_be_logged_in, bearer_scheme
+from ..decorators import must_be_logged_in, bearer_scheme, must_be_admin
 from ..config import settings
 from ..redis_client import get_redis
 from ..schemas import CreateOrderRequest, CreateOrderResponse, OrderStatusResponse
@@ -60,18 +60,15 @@ async def create_order(
     return CreateOrderResponse(order_id=order_id, status="RECEIVED")
 
 
-@router.get("/{id}", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
+@router.get("/my_orders", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
 @must_be_logged_in
-async def get_order(request: Request, id: UUID, redis: redis_dependency) -> OrderStatusResponse:
-    raw = await redis.execute_command("HGETALL", f"order:{id}")
+async def get_my_orders(request: Request, writer_client: writer_dependency):
+    data = await writer_client.get("/internal/orders/my_orders", headers={"X-Customer": request.state.username})
+    return data
 
-    if isinstance(raw, dict):
-        data = raw
-    elif isinstance(raw, (list, tuple)):
-        data = dict(zip(raw[::2], raw[1::2])) if raw else {}
-    else:
-        data = {}
 
-    if not data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return OrderStatusResponse(order_id=str(id), **data)
+@router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
+@must_be_admin
+async def list_orders(request: Request, writer_client: writer_dependency):
+    data = await writer_client.get("/internal/orders")
+    return data

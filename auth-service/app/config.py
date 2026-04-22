@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     public_key: str = Field(validation_alias=AliasChoices("PUBLIC_KEY", "public_key"))
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias=AliasChoices("REDIS_URL", "redis_url"))
     access_token_expire_minutes: int = Field(default=30, validation_alias=AliasChoices("ACCESS_TOKEN_EXPIRE_MINUTES", "access_token_expire_minutes"))
+    redis_user: str = Field(default="", validation_alias=AliasChoices("REDIS_USER", "redis_user"))
+    redis_password: str = Field(default="", validation_alias=AliasChoices("REDIS_PASSWORD", "redis_password"))
 
     @field_validator("database_url", mode="before")
     @classmethod

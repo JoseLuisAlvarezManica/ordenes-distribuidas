@@ -57,9 +57,7 @@ async def _blacklist_token(token: str, payload: dict[str, Any], redis: aioredis.
     ttl = max(int(exp - datetime.now(timezone.utc).timestamp()), 1)
     await redis.setex(f"blacklist:{token}", ttl, "1")
 
-@router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(body: SignUp, db: AsyncSession = Depends(get_db)):
-
+async def create_user(body: SignUp, role: str, db: AsyncSession):
     logger.info("Signup attempt for email: %s", body.email)
 
     result = await db.execute(select(Users).where(Users.email == body.email))
@@ -77,7 +75,7 @@ async def signup(body: SignUp, db: AsyncSession = Depends(get_db)):
         email=body.email,
         phone_number=body.phone_number,
         password=hash_password(body.password),
-        role="user",
+        role=role,
     )
 
     db.add(new_user)
@@ -88,6 +86,14 @@ async def signup(body: SignUp, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create user")
     logger.info("User created successfully: %s", body.email)
     return {"detail": "User created successfully"}
+
+@router.post("/signup", status_code=status.HTTP_201_CREATED)
+async def signup(body: SignUp, db: AsyncSession = Depends(get_db)):
+    return await create_user(body, role="user", db=db)
+
+@router.post("/admin/register", status_code=status.HTTP_201_CREATED)
+async def register_admin(body: SignUp, db: AsyncSession = Depends(get_db)):
+    return await create_user(body, role="admin", db=db)
 
 
 @router.post("/login", status_code=status.HTTP_200_OK, response_model=TokenResponse)

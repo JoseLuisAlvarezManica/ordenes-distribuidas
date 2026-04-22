@@ -408,3 +408,20 @@ curl -s -X POST http://localhost:8000/auth/logout \
 curl -s -X POST http://localhost:8000/auth/refresh \
   -H "Authorization: Bearer $NEW_TOKEN"
 ```
+
+### Decoradores en el API Gateway
+
+En el archivo `decorators.py` del API Gateway, se definen dos decoradores principales que se utilizan para manejar la autenticación y la autorización en las rutas:
+
+1. **`must_be_logged_in`**:
+   - Este decorador asegura que el usuario esté autenticado antes de acceder a una ruta.
+   - Verifica que la solicitud tenga un encabezado de autorización válido en el formato `Bearer <token>`.
+   - Decodifica el token JWT utilizando una clave pública y extrae información como el nombre de usuario (`username`), número de teléfono (`phone_number`) y rol (`role`).
+   - Si el token no es válido o falta el encabezado de autorización, lanza una excepción HTTP 401 (No autorizado).
+
+2. **`must_be_admin`**:
+   - Este decorador extiende la funcionalidad de `must_be_logged_in` para verificar que el usuario tenga permisos de administrador.
+   - Además de validar el token JWT, comprueba que el rol del usuario sea `admin`.
+   - Si el rol no es `admin`, lanza una excepción HTTP 403 (Prohibido).
+
+Ambos decoradores utilizan la librería `fastapi` para manejar excepciones HTTP y la librería `jose` para decodificar los tokens JWT. También se utiliza la función auxiliar `_wrap_pem` para formatear correctamente las claves públicas en formato PEM.

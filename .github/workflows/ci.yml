@@ -1,0 +1,9 @@
+name: CI   #Nombre del Workflow
+on: [push, pull_request]  #Eventos que disparana el workflow
+
+jobs:
+  test: #Nombre del job
+    runs-on: ubuntu-latest #Runner (maquina virtual) donde se ejecutara el job
+    steps:
+      - uses: actions/checkout@v4 #Paso 1: Clonar el repositorio
+      - run: echo "Hola CI" #Paso 2: Ejecutar un comando

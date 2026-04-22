@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from ..decorators import must_be_logged_in, bearer_scheme
+from ..decorators import must_be_logged_in, bearer_scheme, must_be_admin
 from ..services.auth_client import AuthClient, get_auth_client
 from ..schemas import SignUpRequest, LoginRequest, TokenResponse, MessageResponse, MeResponse
 
@@ -22,6 +22,7 @@ async def signup(body: SignUpRequest, auth_client: auth_dependency):
     return data
 
 @router.post("/admin/register", status_code=status.HTTP_201_CREATED, response_model=MessageResponse)
+@must_be_admin
 async def signup(body: SignUpRequest, auth_client: auth_dependency):
     code, data = await auth_client.post("/auth/admin/register", body.model_dump())
     if code != status.HTTP_201_CREATED:

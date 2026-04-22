@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..redis_client import get_redis
-from ..repositories.orders_repo import upsert_order, validate_stock
+from ..repositories.orders_repo import upsert_order, validate_stock, list_orders_by_customer, list_all_orders
 from ..schemas import InternalOrder
 from ..rabbit_publisher import RabbitPublisher, get_publisher
 
@@ -23,7 +23,7 @@ async def create_internal_order(
     db: AsyncSession = Depends(get_db),
     publisher: RabbitPublisher = Depends(get_publisher),
     request_id: str | None = Header(default=None, alias="X-Request-Id"),
-) -> dict[str, str]:
+) -> dict[str, str]:id: UUID,
     correlation_id = request_id or "N/A"
     redis_key = f"order:{order.order_id}"
 
@@ -143,3 +143,16 @@ async def create_internal_order(
         correlation_id,
     )
     return {"order_id": str(order.order_id), "status": "PERSISTED"}
+
+
+@router.get("/my_orders", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
+async def get_my_orders(request: Request, db: AsyncSession = Depends(get_db)):
+    orders = await list_orders_by_customer(db, request.username)
+    return orders
+
+
+@router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
+async def list_orders(request: Request, db: AsyncSession = Depends(get_db)):
+    orders = await list_all_orders(db)
+    return orders
+    

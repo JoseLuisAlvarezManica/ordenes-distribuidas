@@ -43,3 +43,12 @@ async def validate_stock(session: AsyncSession, items: list[dict]) -> list[str]:
         elif product.stock < item["qty"]:
             errors.append(f"SKU '{item['sku']}' stock insuficiente (disponible: {product.stock}, solicitado: {item['qty']})")
     return errors
+
+async def list_orders_by_customer(session: AsyncSession, customer: str) -> list[Order]:
+    result = await session.execute(select(Order).where(Order.customer == customer))
+    return result.scalars().all() if result else []
+
+async def list_all_orders(session: AsyncSession) -> list[Order]:
+    result = await session.execute(select(Order))
+    return result.scalars().all() if result else []
+

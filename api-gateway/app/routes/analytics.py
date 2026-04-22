@@ -1,3 +1,5 @@
+from typing import Annotated
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from ..decorators import must_be_admin, bearer_scheme
 from ..schemas import AnalyticsResponse
@@ -13,6 +15,7 @@ analytics_dependency = Annotated[AnalyticsClient, Depends(get_analytics_client)]
 @router.get("/", response_model=AnalyticsResponse)
 @must_be_admin
 async def get_analytics(
+    request: Request,
     analytics_client: analytics_dependency,
 ) -> AnalyticsResponse:
     try:

@@ -23,7 +23,7 @@ async def signup(body: SignUpRequest, auth_client: auth_dependency):
 
 @router.post("/admin/register", status_code=status.HTTP_201_CREATED, response_model=MessageResponse)
 @must_be_admin
-async def signup_admin(body: SignUpRequest, auth_client: auth_dependency):
+async def signup_admin(request: Request, body: SignUpRequest, auth_client: auth_dependency):
     code, data = await auth_client.post("/auth/admin/register", body.model_dump())
     if code != status.HTTP_201_CREATED:
         raise HTTPException(status_code=code, detail=data)

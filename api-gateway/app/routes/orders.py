@@ -62,15 +62,13 @@ async def create_order(
 
 @router.get("/my_orders", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
 @must_be_logged_in
-async def get_my_orders(request: Request, redis: redis_dependency) -> OrderStatusResponse:
-    data = writer_client.get(f"/internal/orders/{request.state.username}")
-    if not data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return OrderStatusResponse(order_id=str(id), **data)
+async def get_my_orders(request: Request, writer_client: writer_dependency):
+    data = await writer_client.get("/internal/orders/my_orders", headers={"X-Customer": request.state.username})
+    return data
 
 
 @router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
 @must_be_admin
-async def list_orders(request: Request, redis: redis_dependency) -> list[OrderStatusResponse]:
-    data = writer_client.get("/internal/orders")
-    return [OrderStatusResponse(order_id=str(id), **item) for id, item in data.items()]
+async def list_orders(request: Request, writer_client: writer_dependency):
+    data = await writer_client.get("/internal/orders")
+    return data

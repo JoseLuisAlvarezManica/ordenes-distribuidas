@@ -2,7 +2,7 @@ import logging
 import time
 from datetime import datetime, timezone
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
@@ -23,7 +23,7 @@ async def create_internal_order(
     db: AsyncSession = Depends(get_db),
     publisher: RabbitPublisher = Depends(get_publisher),
     request_id: str | None = Header(default=None, alias="X-Request-Id"),
-) -> dict[str, str]:id: UUID,
+) -> dict[str, str]:
     correlation_id = request_id or "N/A"
     redis_key = f"order:{order.order_id}"
 
@@ -145,14 +145,18 @@ async def create_internal_order(
     return {"order_id": str(order.order_id), "status": "PERSISTED"}
 
 
-@router.get("/my_orders", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
+@router.get("/my_orders", status_code=status.HTTP_200_OK)
 async def get_my_orders(request: Request, db: AsyncSession = Depends(get_db)):
-    orders = await list_orders_by_customer(db, request.username)
+    customer = request.headers.get("X-Customer")
+    if not customer:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing X-Customer header")
+
+    orders = await list_orders_by_customer(db, customer)
     return orders
 
 
-@router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(bearer_scheme)])
-async def list_orders(request: Request, db: AsyncSession = Depends(get_db)):
+@router.get("/", status_code=status.HTTP_200_OK)
+async def list_orders(db: AsyncSession = Depends(get_db)):
     orders = await list_all_orders(db)
     return orders
     

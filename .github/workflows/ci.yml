@@ -81,6 +81,9 @@ jobs:
           AUTH_TEST_REDIS_PORT: "6379"
           AUTH_TEST_REDIS_DB: "0"
         run: python -m unittest discover -s .github/workflows/test_auth -p "test_*.py" -v
+      
+      - name: Run analytics workflow tests
+        run: python -m unittest discover -s .github/workflows/test_analytics -p "test_*.py" -v
 
       - name: Show logs on failure
         if: failure()
@@ -89,3 +92,5 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env down -v --remove-orphans
+
+      

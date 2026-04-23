@@ -84,3 +84,33 @@ class OrderStatusResponse(BaseModel):
     order_id: str
     status: str
     last_update: str | None = None
+
+
+class TopProduct(BaseModel):
+    sku: str
+    total_qty: int
+
+
+class MostFrequentCustomer(BaseModel):
+    customer: str
+    orders: int
+
+
+class ErrorRates(BaseModel):
+    publish_error_percentage: float
+    system_error_percentage: float
+    error_events: int
+
+
+class AvgTimesMs(BaseModel):
+    persist_order_postgres: float | None = None
+    publish_event_rabbitmq: float | None = None
+    notification: float | None = None
+
+
+class AnalyticsResponse(BaseModel):
+    total_orders_seen: int
+    top_products: list[TopProduct]
+    most_frequent_customer: MostFrequentCustomer | None = None
+    error_rates: ErrorRates
+    avg_times_ms: AvgTimesMs

@@ -129,8 +129,12 @@ services:
     env_file: ${ENV_FILE:-.env.dev}
     restart: on-failure
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+          postgres:
+            condition: service_healthy
+          rabbitmq:
+            condition: service_healthy
+          writer-service:
+            condition: service_started
 
 volumes:
   pg_data:

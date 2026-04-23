@@ -13,7 +13,11 @@ class AnalyticsClient:
     async def get(self, endpoint: str, headers: dict | None = None):
         logger.info("AnalyticsClient GET %s", endpoint)
         response = await self.session.get(endpoint, headers=headers or {})
-        return response.status_code, response.json()
+        response.raise_for_status()
+        return response.json()
+
+    async def get_analytics(self):
+        return await self.get("/analytics")
 
 
 async def get_analytics_client():

@@ -85,6 +85,9 @@ jobs:
       - name: Run analytics workflow tests
         run: python -m unittest discover -s .github/workflows/test_analytics -p "test_*.py" -v
 
+      - name: Run orders workflow tests
+        run: python -m unittest discover -s .github/workflows/test_orders -p "test_*.py" -v
+      
       - name: Show logs on failure
         if: failure()
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env logs --tail=200

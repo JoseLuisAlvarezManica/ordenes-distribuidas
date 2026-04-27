@@ -60,6 +60,15 @@ jobs:
       - name: Install auth test dependencies
         run: pip install -r .github/workflows/test_auth/requirements.txt
 
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff check (lint)
+        run: ruff check . --no-fix --exit-zero-if-changed --output-format=full
+
+      - name: Ruff format (check only)
+        run: ruff format . --check --diff --exit-code --verbose
+
       - name: Start services
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env up --build -d
 

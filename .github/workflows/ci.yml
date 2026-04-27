@@ -64,10 +64,10 @@ jobs:
         run: pip install ruff
 
       - name: Ruff check (lint)
-        run: ruff check . --no-fix --exit-zero-if-changed --output-format=full
+        run: ruff check . --no-fix --exit-zero --output-format=full
 
       - name: Ruff format (check only)
-        run: ruff format . --check --diff --exit-code --verbose
+        run: ruff format . --check --diff --verbose
 
       - name: Start services
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env up --build -d

@@ -49,7 +49,9 @@ async def authenticate_user(email: str, password: str, db: AsyncSession):
     return user
 
 
-def create_access_token(username: str, email: str, role: str, phone_number: str, expires_delta: timedelta) -> str:
+def create_access_token(
+    username: str, email: str, role: str, phone_number: str, expires_delta: timedelta
+) -> str:
     issued_at = datetime.now(timezone.utc)
     expires = issued_at + expires_delta
     payload = {
@@ -66,4 +68,3 @@ def create_access_token(username: str, email: str, role: str, phone_number: str,
 
 def decode_token(token: str) -> dict:
     return jwt.decode(token, _PUBLIC_KEY, algorithms=[ALGORITHM])
-

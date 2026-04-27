@@ -16,7 +16,9 @@ def _run_consumer(
     exchange: str,
     queue: str,
     routing_keys: list[str],
-    on_message: Callable[[pika.adapters.blocking_connection.BlockingChannel, any, any, bytes], None],
+    on_message: Callable[
+        [pika.adapters.blocking_connection.BlockingChannel, any, any, bytes], None
+    ],
 ) -> None:
     global _connection
     params = pika.URLParameters(settings.rabbitmq_url)
@@ -37,7 +39,9 @@ def start_subscriber(
     exchange: str,
     queue: str,
     routing_keys: list[str],
-    on_message: Callable[[pika.adapters.blocking_connection.BlockingChannel, any, any, bytes], None],
+    on_message: Callable[
+        [pika.adapters.blocking_connection.BlockingChannel, any, any, bytes], None
+    ],
 ) -> None:
     global _thread
     _thread = threading.Thread(

@@ -25,4 +25,9 @@ async def discount_inventory(items: list[OrderItem]) -> None:
                         f"(disponible: {product.stock}, solicitado: {item.qty})."
                     )
                 product.stock -= item.qty
-                logger.info("SKU %s: descontado %d (restante: %d).", item.sku, item.qty, product.stock)
+                logger.info(
+                    "SKU %s: descontado %d (restante: %d).",
+                    item.sku,
+                    item.qty,
+                    product.stock,
+                )

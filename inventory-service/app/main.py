@@ -7,7 +7,7 @@ import time
 from .schemas import OrderCreatedEvent
 from .services.inventory_service import discount_inventory
 from .services.rabbit_publisher import publish_processing_event
-from .services.rabbit_subscriber import start_subscriber, stop_subscriber
+from .services.rabbit_subscriber import start_subscriber
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,6 +22,7 @@ QUEUE = "inventory.order.created"
 ROUTING_KEY = "order.created"
 
 _loop = None
+
 
 def on_order_created(channel, method, properties, body: bytes) -> None:
     global _loop
@@ -58,7 +59,9 @@ def on_order_created(channel, method, properties, body: bytes) -> None:
                 }
             )
         except Exception as publish_exc:
-            logger.warning("No se pudo publicar evento de error de inventory: %s", publish_exc)
+            logger.warning(
+                "No se pudo publicar evento de error de inventory: %s", publish_exc
+            )
         logger.error("Error procesando order.created: %s", exc, exc_info=True)
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 

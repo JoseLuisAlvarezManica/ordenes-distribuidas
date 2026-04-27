@@ -19,16 +19,21 @@ def normalize_phone_number(raw_phone: str) -> str:
         raise ValueError("Formato de teléfono inválido")
     return digits
 
-async def register_user(session: AsyncSession, phone_number: str, chat_id: str) -> tuple[bool, str]:
+
+async def register_user(
+    session: AsyncSession, phone_number: str, chat_id: str
+) -> tuple[bool, str]:
     try:
         phone = normalize_phone_number(phone_number)
         result = await session.execute(
-            select(TelegramSubscription).where(
+            select(TelegramSubscription)
+            .where(
                 or_(
                     TelegramSubscription.phone_number == phone,
                     TelegramSubscription.phone_number.like(f"%{phone}"),
                 )
-            ).order_by(TelegramSubscription.updated_at.desc())
+            )
+            .order_by(TelegramSubscription.updated_at.desc())
         )
         existing = result.scalars().first()
 
@@ -42,6 +47,9 @@ async def register_user(session: AsyncSession, phone_number: str, chat_id: str) 
         await session.commit()
         return True, "Suscripción registrada exitosamente"
     except ValueError:
-        return False, "Formato de teléfono inválido. Ejemplo válido: /register 3001112233"
+        return (
+            False,
+            "Formato de teléfono inválido. Ejemplo válido: /register 3001112233",
+        )
     except Exception as exc:
         return False, f"Error al registrar la suscripción: {str(exc)}"

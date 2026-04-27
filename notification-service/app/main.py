@@ -37,12 +37,7 @@ def _build_message(event: OrderCreatedEvent) -> str:
     )
     if not items_text:
         items_text = "(sin ítems)"
-    return (
-        "Hola!, \n"
-        f"tu orden de:\n"
-        f"{items_text}\n"
-        "fue realizada con exito."
-    )
+    return f"Hola!, \ntu orden de:\n{items_text}\nfue realizada con exito."
 
 
 def _build_error_message(event: OrderErrorEvent) -> str:
@@ -73,6 +68,7 @@ async def _send_telegram_message(phone_number: str, text: str) -> None:
             f"telegram-bot respondió {response.status_code}: {response.text}"
         )
 
+
 async def _save_notification(
     session: AsyncSession, notification: NotificationMessage
 ) -> None:
@@ -87,7 +83,9 @@ async def _save_notification(
     await session.commit()
 
 
-async def _save_created_error_notification(event: OrderCreatedEvent, error_description: str) -> None:
+async def _save_created_error_notification(
+    event: OrderCreatedEvent, error_description: str
+) -> None:
     notification = NotificationMessage(
         order_id=event.order_id,
         customer=event.customer,
@@ -243,8 +241,12 @@ def on_order_event(channel, method, properties, body: bytes) -> None:
                 }
             )
         except Exception as publish_exc:
-            logger.warning("No se pudo publicar evento de error de notification: %s", publish_exc)
-        logger.error("Error procesando %s: %s", routing_key or "evento", exc, exc_info=True)
+            logger.warning(
+                "No se pudo publicar evento de error de notification: %s", publish_exc
+            )
+        logger.error(
+            "Error procesando %s: %s", routing_key or "evento", exc, exc_info=True
+        )
         channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 

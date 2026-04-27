@@ -34,6 +34,7 @@ class OrderErrorEvent(BaseModel):
     stage: str
     error: str | None = None
 
+
 class NotificationMessage(BaseModel):
     order_id: str
     customer: str

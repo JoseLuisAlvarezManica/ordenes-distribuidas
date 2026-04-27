@@ -31,3 +31,5 @@ Thumbs.db
 
 # Docker volumes
 pg_data/
+
+.ruff_cache/

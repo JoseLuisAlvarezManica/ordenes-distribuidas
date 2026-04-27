@@ -4,8 +4,8 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-class WriterClient:
 
+class WriterClient:
     def __init__(self, session: httpx.AsyncClient):
         self.session = session
         self.max_retries = settings.writer_max_retries
@@ -16,13 +16,27 @@ class WriterClient:
         total_attempts = retries + 1
         for attempt in range(total_attempts):
             try:
-                logger.info("Enviando a writer %s intento=%d [X-Request-Id: %s]", endpoint, attempt + 1, request_id)
+                logger.info(
+                    "Enviando a writer %s intento=%d [X-Request-Id: %s]",
+                    endpoint,
+                    attempt + 1,
+                    request_id,
+                )
                 response = await self.session.post(endpoint, json=data, headers=headers)
                 response.raise_for_status()
-                logger.info("Writer respondió %d [X-Request-Id: %s]", response.status_code, request_id)
+                logger.info(
+                    "Writer respondió %d [X-Request-Id: %s]",
+                    response.status_code,
+                    request_id,
+                )
                 return response.json()
             except (httpx.HTTPStatusError, httpx.TransportError) as exc:
-                logger.warning("Intento %d fallido: %s [X-Request-Id: %s]", attempt + 1, exc, request_id)
+                logger.warning(
+                    "Intento %d fallido: %s [X-Request-Id: %s]",
+                    attempt + 1,
+                    exc,
+                    request_id,
+                )
         raise Exception("Max retries exceeded")
 
     async def get(self, endpoint: str, headers: dict | None = None):
@@ -31,14 +45,29 @@ class WriterClient:
         total_attempts = retries + 1
         for attempt in range(total_attempts):
             try:
-                logger.info("GET a writer %s intento=%d [X-Request-Id: %s]", endpoint, attempt + 1, request_id)
+                logger.info(
+                    "GET a writer %s intento=%d [X-Request-Id: %s]",
+                    endpoint,
+                    attempt + 1,
+                    request_id,
+                )
                 response = await self.session.get(endpoint, headers=headers)
                 response.raise_for_status()
-                logger.info("Writer respondió %d [X-Request-Id: %s]", response.status_code, request_id)
+                logger.info(
+                    "Writer respondió %d [X-Request-Id: %s]",
+                    response.status_code,
+                    request_id,
+                )
                 return response.json()
             except (httpx.HTTPStatusError, httpx.TransportError) as exc:
-                logger.warning("Intento %d fallido GET: %s [X-Request-Id: %s]", attempt + 1, exc, request_id)
+                logger.warning(
+                    "Intento %d fallido GET: %s [X-Request-Id: %s]",
+                    attempt + 1,
+                    exc,
+                    request_id,
+                )
         raise Exception("Max retries exceeded")
+
 
 # Inyección de dependencia, solo hable un cliente por request
 async def get_writer_client():

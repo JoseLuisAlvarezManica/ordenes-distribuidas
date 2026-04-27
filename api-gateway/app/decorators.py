@@ -21,6 +21,7 @@ def _wrap_pem(key: str, key_type: str) -> str:
     body = "\n".join(textwrap.wrap(body_raw, 64))
     return f"-----BEGIN {key_type}-----\n{body}\n-----END {key_type}-----"
 
+
 def must_be_logged_in(route):
     @wraps(route)
     async def wrapper(*args, **kwargs):
@@ -75,8 +76,7 @@ def must_be_admin(route):
         request = kwargs.get("request")
         if request is None or not isinstance(request, Request):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Petición invalida."
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Petición invalida."
             )
 
         authorization = request.headers.get("Authorization")
@@ -122,4 +122,3 @@ def must_be_admin(route):
 
 
 bearer_scheme = HTTPBearer()
-

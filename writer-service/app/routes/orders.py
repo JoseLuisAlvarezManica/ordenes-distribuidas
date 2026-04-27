@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..redis_client import get_redis
-from ..repositories.orders_repo import upsert_order, validate_stock, list_orders_by_customer, list_all_orders
+from ..repositories.orders_repo import (
+    upsert_order,
+    validate_stock,
+    list_orders_by_customer,
+    list_all_orders,
+)
 from ..schemas import InternalOrder
 from ..rabbit_publisher import RabbitPublisher, get_publisher
 
@@ -27,10 +32,14 @@ async def create_internal_order(
     correlation_id = request_id or "N/A"
     redis_key = f"order:{order.order_id}"
 
-    stock_errors = await validate_stock(db, [{"sku": item.sku, "qty": item.qty} for item in order.items])
+    stock_errors = await validate_stock(
+        db, [{"sku": item.sku, "qty": item.qty} for item in order.items]
+    )
     if stock_errors:
         now = datetime.now(timezone.utc).isoformat()
-        await redis.execute_command("HSET", redis_key, "status", "FAILED", "last_update", now)
+        await redis.execute_command(
+            "HSET", redis_key, "status", "FAILED", "last_update", now
+        )
         try:
             await publisher.publish_order_error(
                 {
@@ -40,7 +49,9 @@ async def create_internal_order(
                 }
             )
         except Exception as publish_exc:
-            logger.warning("No se pudo publicar order.error (validation): %s", publish_exc)
+            logger.warning(
+                "No se pudo publicar order.error (validation): %s", publish_exc
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"errors": stock_errors},
@@ -57,7 +68,9 @@ async def create_internal_order(
         persist_ms = (time.perf_counter() - persist_started) * 1000
     except Exception as exc:
         now = datetime.now(timezone.utc).isoformat()
-        await redis.execute_command("HSET", redis_key, "status", "FAILED", "last_update", now)
+        await redis.execute_command(
+            "HSET", redis_key, "status", "FAILED", "last_update", now
+        )
         try:
             await publisher.publish_order_error(
                 {
@@ -80,7 +93,9 @@ async def create_internal_order(
         ) from exc
 
     now = datetime.now(timezone.utc).isoformat()
-    await redis.execute_command("HSET", redis_key, "status", "PERSISTED", "last_update", now)
+    await redis.execute_command(
+        "HSET", redis_key, "status", "PERSISTED", "last_update", now
+    )
 
     try:
         publish_started = time.perf_counter()
@@ -112,7 +127,9 @@ async def create_internal_order(
         )
     except Exception as exc:
         now = datetime.now(timezone.utc).isoformat()
-        await redis.execute_command("HSET", redis_key, "status", "FAILED", "last_update", now)
+        await redis.execute_command(
+            "HSET", redis_key, "status", "FAILED", "last_update", now
+        )
         try:
             await publisher.publish_order_error(
                 {
@@ -149,7 +166,9 @@ async def create_internal_order(
 async def get_my_orders(request: Request, db: AsyncSession = Depends(get_db)):
     customer = request.headers.get("X-Customer")
     if not customer:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing X-Customer header")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing X-Customer header"
+        )
 
     orders = await list_orders_by_customer(db, customer)
     return orders
@@ -159,4 +178,3 @@ async def get_my_orders(request: Request, db: AsyncSession = Depends(get_db)):
 async def list_orders(db: AsyncSession = Depends(get_db)):
     orders = await list_all_orders(db)
     return orders
-    

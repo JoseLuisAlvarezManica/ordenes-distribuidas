@@ -1,8 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 
-class Settings(BaseSettings):
 
+class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     redis_url: str = os.getenv("REDIS_URL")

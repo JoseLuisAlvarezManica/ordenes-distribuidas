@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 SKU_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
 PHONE_PATTERN = re.compile(r"^\+?[1-9]\d{7,14}$")
 
-class OrderItem(BaseModel):
 
+class OrderItem(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     sku: str = Field(
@@ -29,10 +29,9 @@ class OrderItem(BaseModel):
 
 
 class InternalOrder(BaseModel):
-
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     _control_chars: ClassVar[re.Pattern[str]] = re.compile(r"[\x00-\x1f\x7f]")
-    
+
     order_id: UUID = Field(
         ...,
         description="UUID v4 generado por el api-gateway (36 caracteres con guiones)",
@@ -59,4 +58,3 @@ class InternalOrder(BaseModel):
         if not normalized.startswith("+"):
             normalized = f"+{normalized}"
         return normalized
-

@@ -35,7 +35,9 @@ def _items_to_list(raw_items: Any) -> list[dict[str, Any]]:
 
 async def preload_business_metrics_from_orders(aggregator: AnalyticsAggregator) -> int:
     if not settings.database_url:
-        logger.warning("DATABASE_URL no configurado; analytics inicia sin precarga historica")
+        logger.warning(
+            "DATABASE_URL no configurado; analytics inicia sin precarga historica"
+        )
         return 0
 
     conn: asyncpg.Connection | None = None
@@ -54,7 +56,9 @@ async def preload_business_metrics_from_orders(aggregator: AnalyticsAggregator) 
         logger.info("Analytics precargado con %s ordenes historicas", len(rows))
         return len(rows)
     except Exception as exc:
-        logger.error("No se pudo precargar analytics desde orders: %s", exc, exc_info=True)
+        logger.error(
+            "No se pudo precargar analytics desde orders: %s", exc, exc_info=True
+        )
         return 0
     finally:
         if conn is not None:

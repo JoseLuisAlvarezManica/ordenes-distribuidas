@@ -122,8 +122,12 @@ def build_seed_orders(support_number: str | None) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed de 5 ordenes via API Gateway")
-    parser.add_argument("--base-url", default="http://localhost:8000", help="URL base de api-gateway")
-    parser.add_argument("--timeout", type=float, default=5.0, help="Timeout HTTP por request")
+    parser.add_argument(
+        "--base-url", default="http://localhost:8000", help="URL base de api-gateway"
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=5.0, help="Timeout HTTP por request"
+    )
     parser.add_argument(
         "--status-wait-seconds",
         type=float,
@@ -141,9 +145,13 @@ def main() -> None:
         print("No se encontro SUPPORT_NUMBER en .env, se usara numero fallback.")
 
     if analytics_admin_token:
-        print("ANALYTICS_ADMIN_TOKEN detectado en .env: se enviara Authorization Bearer en /analytics")
+        print(
+            "ANALYTICS_ADMIN_TOKEN detectado en .env: se enviara Authorization Bearer en /analytics"
+        )
     else:
-        print("ANALYTICS_ADMIN_TOKEN no detectado: /analytics puede responder 401 o 503")
+        print(
+            "ANALYTICS_ADMIN_TOKEN no detectado: /analytics puede responder 401 o 503"
+        )
 
     orders_url = f"{args.base_url.rstrip('/')}/orders/"
     created_order_ids: list[str] = []
@@ -179,7 +187,9 @@ def main() -> None:
         headers=analytics_headers,
     )
     print("\n== Snapshot de analitica ==")
-    print(f"GET /analytics -> status {analytics_status} | response: {analytics_response}")
+    print(
+        f"GET /analytics -> status {analytics_status} | response: {analytics_response}"
+    )
 
 
 if __name__ == "__main__":

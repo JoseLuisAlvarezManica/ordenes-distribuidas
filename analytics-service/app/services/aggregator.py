@@ -105,13 +105,19 @@ class AnalyticsAggregator:
                     "error_events": self._error_events_total,
                 },
                 "avg_times_ms": {
-                    "persist_order_postgres": round(self._persist_ms_sum / self._persist_ms_count, 2)
+                    "persist_order_postgres": round(
+                        self._persist_ms_sum / self._persist_ms_count, 2
+                    )
                     if self._persist_ms_count
                     else None,
-                    "publish_event_rabbitmq": round(self._publish_ms_sum / self._publish_ms_count, 2)
+                    "publish_event_rabbitmq": round(
+                        self._publish_ms_sum / self._publish_ms_count, 2
+                    )
                     if self._publish_ms_count
                     else None,
-                    "notification": round(self._notification_ms_sum / self._notification_ms_count, 2)
+                    "notification": round(
+                        self._notification_ms_sum / self._notification_ms_count, 2
+                    )
                     if self._notification_ms_count
                     else None,
                 },

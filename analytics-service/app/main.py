@@ -1,11 +1,9 @@
 import logging
-import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import FastAPI
+from fastapi.security import HTTPBearer
 
-from .config import settings
 from .schemas import OrderCreatedEvent, OrderErrorEvent, OrderProcessingEvent
 from .services.aggregator import AnalyticsAggregator
 from .services.bootstrap_loader import preload_business_metrics_from_orders
@@ -25,6 +23,7 @@ ROUTING_KEYS = ["order.created", "order.error", "order.processing"]
 
 aggregator = AnalyticsAggregator()
 bearer_scheme = HTTPBearer(auto_error=False)
+
 
 def on_order_event(channel, method, properties, body: bytes) -> None:
     try:

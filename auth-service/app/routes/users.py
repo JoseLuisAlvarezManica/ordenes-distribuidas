@@ -10,7 +10,12 @@ from jose import JWTError
 import redis.asyncio as aioredis
 
 from ..db import get_db
-from ..encryption import hash_password, authenticate_user, create_access_token, decode_token
+from ..encryption import (
+    hash_password,
+    authenticate_user,
+    create_access_token,
+    decode_token,
+)
 from ..config import settings
 from ..schemas import SignUp, Login, TokenResponse, MeResponse
 from ..models import Users
@@ -27,7 +32,9 @@ bearer_scheme = HTTPBearer()
 def _get_required_claim(payload: dict[str, Any], field: str) -> str:
     value = payload.get(field)
     if not isinstance(value, str) or not value:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
     return value
 
 
@@ -40,34 +47,42 @@ async def _validate_bearer_token(
         payload = decode_token(token)
     except JWTError as exc:
         logger.warning("Token validation failed: %s", exc)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
 
     is_revoked = await redis.get(f"blacklist:{token}")
     if is_revoked:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked"
+        )
 
     return payload, token
 
 
-async def _blacklist_token(token: str, payload: dict[str, Any], redis: aioredis.Redis) -> None:
+async def _blacklist_token(
+    token: str, payload: dict[str, Any], redis: aioredis.Redis
+) -> None:
     exp = payload.get("exp")
     if not isinstance(exp, (int, float)):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
 
     ttl = max(int(exp - datetime.now(timezone.utc).timestamp()), 1)
     await redis.setex(f"blacklist:{token}", ttl, "1")
+
 
 async def create_user(body: SignUp, role: str, db: AsyncSession):
     logger.info("Signup attempt for email: %s", body.email)
 
     result = await db.execute(select(Users).where(Users.email == body.email))
     existing = result.scalar_one_or_none()
-    
+
     if existing:
         logger.warning("Signup rejected, email already exists: %s", body.email)
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered"
+            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         )
 
     new_user = Users(
@@ -83,13 +98,18 @@ async def create_user(body: SignUp, role: str, db: AsyncSession):
         await db.commit()
     except Exception as exc:
         logger.error("Failed to create user %s: %s", body.email, exc)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create user")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not create user",
+        )
     logger.info("User created successfully: %s", body.email)
     return {"detail": "User created successfully"}
+
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(body: SignUp, db: AsyncSession = Depends(get_db)):
     return await create_user(body, role="user", db=db)
+
 
 @router.post("/admin/register", status_code=status.HTTP_201_CREATED)
 async def register_admin(body: SignUp, db: AsyncSession = Depends(get_db)):
@@ -118,6 +138,7 @@ async def login(body: Login, db: AsyncSession = Depends(get_db)):
     logger.info("Login successful for email: %s", body.email)
     return TokenResponse(access_token=token)
 
+
 @router.post("/refresh", status_code=status.HTTP_200_OK, response_model=TokenResponse)
 async def refresh(
     token_context: tuple[dict[str, Any], str] = Depends(_validate_bearer_token),
@@ -145,6 +166,7 @@ async def refresh(
     logger.info("Token refreshed for email: %s; previous token revoked", email)
     return TokenResponse(access_token=renewed_token)
 
+
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
     token_context: tuple[dict[str, Any], str] = Depends(_validate_bearer_token),
@@ -155,6 +177,7 @@ async def logout(
     await _blacklist_token(token, payload, redis)
     logger.info("User logged out: %s", payload.get("email"))
     return {"detail": "Logged out successfully"}
+
 
 @router.get("/me", status_code=status.HTTP_200_OK, response_model=MeResponse)
 async def me(
@@ -167,7 +190,9 @@ async def me(
     result = await db.execute(select(Users).where(Users.email == email))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     return MeResponse(
         username=user.username,

@@ -46,7 +46,9 @@ class RabbitPublisher:
         connection = pika.BlockingConnection(pika.URLParameters(self._rabbitmq_url))
         try:
             channel = connection.channel()
-            channel.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
+            channel.exchange_declare(
+                exchange=EXCHANGE, exchange_type="topic", durable=True
+            )
             channel.basic_publish(
                 exchange=EXCHANGE,
                 routing_key=routing_key,
@@ -67,10 +69,16 @@ class RabbitPublisher:
             try:
                 self._publish_once(routing_key, body)
                 return
-            except (AMQPConnectionError, StreamLostError, ChannelWrongStateError) as exc:
+            except (
+                AMQPConnectionError,
+                StreamLostError,
+                ChannelWrongStateError,
+            ) as exc:
                 if attempt == 1:
                     raise
-                logger.warning("Rabbit publish failed (attempt %s): %s", attempt + 1, exc)
+                logger.warning(
+                    "Rabbit publish failed (attempt %s): %s", attempt + 1, exc
+                )
                 time.sleep(0.2)
 
     async def publish(self, routing_key: str, payload: dict) -> None:

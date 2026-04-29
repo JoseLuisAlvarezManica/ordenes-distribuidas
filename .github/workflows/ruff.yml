@@ -1,0 +1,32 @@
+name: ruff-quality-check
+
+on:
+  push:
+    branches: [features/QA]
+  pull_request:
+    branches: [features/QA]
+
+jobs:
+  ruff-quality-check:
+    runs-on: ubuntu-latest
+    environment: workflows
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff check (lint)
+        run: ruff check . --no-fix --output-format=full
+
+      - name: Ruff format (check only)
+        run: ruff format . --check --diff --verbose
+      
